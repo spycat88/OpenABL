@@ -123,13 +123,11 @@ VOID
 SplashMarkDisplayOn (
   IN OUT UINT8 *Fdt,
   IN UINTN      Cap,
-  IN BOOLEAN    Declared,
   IN LOG_SINK   Log
 )
 {
   UINTN Chosen;
 
-  (VOID)Declared;
   // A display-off request is the only way the display goes off: nothing
   // turns it off at ExitBootServices, even without a splash region.
   if (DisplayOffAsked ()) {
@@ -204,105 +202,4 @@ SplashReserveSplash (
     Log, "splash: XBL's display memory 0x%llx 0x%llx: %s", (UINT64)Base,
     (UINT64)Length, What
   );
-}
-
-// Whether a compatible string belongs to a mainline MDSS node.
-STATIC BOOLEAN
-IsMdss (
-  IN CONST UINT8 *Compat,
-  IN UINTN        Size,
-  IN VOID        *Context
-)
-{
-  STATIC CONST CHAR8 End[]  = "-mdss";
-  CONST UINTN        EndLen = sizeof (End) - 1;
-
-  (VOID)Context;
-  return Size >= EndLen &&
-         CompareMem (Compat + Size - EndLen, End, EndLen) == 0;
-}
-
-BOOLEAN
-SplashDeclare (
-  IN OUT UINT8 *Fdt,
-  IN UINTN      Cap,
-  IN LOG_SINK   Log
-)
-{
-  DT_FRAMEBUFFER_NODE Node;
-  DT_FRAMEBUFFER      Fb;
-  DT_ERROR            Error;
-  UINT64              RegionBase;
-  UINT64              RegionLength;
-  BOOLEAN             Added;
-  CHAR8               Reserved[64];
-
-  if (!DisplayHandoverKeepLogoSetting ()) {
-    LogLine (
-      Log, "splash: not declared (Keep logo through boot is off): the stock "
-           "hand-over"
-    );
-    return FALSE;
-  }
-  if (DisplayOffAsked ()) {
-    LogLine (
-      Log, "splash: not declared: DisplayQuiesce asks for the display off"
-    );
-    return FALSE;
-  }
-  // A downstream Android tree has Qualcomm's splash region and no mainline
-  // MDSS node. The ABL's splash step handles it and the techpack driver
-  // adopts the splash. Linux trees can have a splash_region too, but with
-  // mainline display nodes, so they get the framebuffer node.
-  if (HasSplashRegion (Fdt, Cap)) {
-    DT_NODES Mdss = {0};
-    BOOLEAN  None;
-
-    DtNodesWhere (Fdt, Cap, IsMdss, NULL, &Mdss);
-    None = Mdss.Count == 0;
-    VecFree (&Mdss);
-    if (None) {
-      LogLine (
-        Log,
-        "splash: a downstream tree with Android's splash region: left to the "
-        "kernel's own hand-over"
-      );
-      return FALSE;
-    }
-  }
-  if (!SplashFramebuffer (&Fb)) {
-    LogLine (Log, "splash: no linear framebuffer to declare");
-    return FALSE;
-  }
-  RegionFor (&Fb, &RegionBase, &RegionLength);
-  if (DtReserveMemory (Fdt, Cap, RegionBase, RegionLength, &Added) != DT_OK) {
-    AsciiStrCopy (Reserved, sizeof (Reserved), ", NOT reserved (no room)");
-  } else if (Added) {
-    SPrint (
-      Reserved, sizeof (Reserved), ", reserved 0x%llx 0x%llx",
-      (UINT64)RegionBase, (UINT64)RegionLength
-    );
-  } else {
-    AsciiStrCopy (Reserved, sizeof (Reserved), ", reserved already");
-  }
-  Error = DtAddFramebuffer (Fdt, Cap, &Fb, &Node);
-  if (Error == DT_OK) {
-    LogPrint (
-      Log,
-      "splash: /chosen/framebuffer@%llx: %ux%u %s, %llu display clocks%s%s; "
-      "the display "
-      "stays on",
-      (UINT64)Fb.Base, (UINT32)Fb.Width, (UINT32)Fb.Height, Fb.Format,
-      (UINT64)Node.Clocks,
-      Node.PowerDomain ? ", the MDSS power domain" : ", no MDSS power domain",
-      Reserved
-    );
-    return TRUE;
-  }
-  if (Error == DT_NO_SPACE) {
-    LogLine (Log, "splash: no room in the devicetree for the framebuffer node");
-  } else {
-    LogLine (Log, "splash: not a devicetree to declare it in");
-  }
-  return FALSE;
 }

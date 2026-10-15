@@ -6,11 +6,9 @@
 /**
   Splash - keeping the firmware's splash on screen through the hand-over.
 
-  With "Keep logo through boot" on, the kernel gets /chosen/framebuffer@BASE,
-  a simple-framebuffer with the display's clocks and power domain taken from
-  the tree's display nodes, which simpledrm shows until the display driver
-  takes over. Downstream Android trees are left alone. The display stays on
-  into the kernel unless a display-off is asked for.
+  The splash memory is reserved in the kernel's devicetree and /chosen tells
+  the kernel the display is still on. The display stays on into the kernel
+  unless a display-off is asked for.
 */
 
 #ifndef __EFI_SPLASH_H__
@@ -30,12 +28,11 @@ BOOLEAN
 SplashFramebuffer (OUT DT_FRAMEBUFFER *Out);
 
 // Adds /chosen/openabl,display-on to tell the kernel the display is still
-// running, unless DisplayQuiesce asks for a display-off. Declared is unused.
+// running, unless DisplayQuiesce asks for a display-off.
 VOID
 SplashMarkDisplayOn (
   IN OUT UINT8 *Fdt,
   IN UINTN      Cap,
-  IN BOOLEAN    Declared,
   IN LOG_SINK   Log
 );
 
@@ -47,17 +44,6 @@ SplashMarkDisplayOn (
 // asked for.
 VOID
 SplashReserveSplash (
-  IN OUT UINT8 *Fdt,
-  IN UINTN      Cap,
-  IN LOG_SINK   Log
-);
-
-// Adds the framebuffer node and reserves its memory, so the kernel keeps
-// showing the splash. FALSE when the setting is off, a display-off is asked
-// for, the tree is a downstream one, there is no linear framebuffer, or the
-// node doesn't fit.
-BOOLEAN
-SplashDeclare (
   IN OUT UINT8 *Fdt,
   IN UINTN      Cap,
   IN LOG_SINK   Log

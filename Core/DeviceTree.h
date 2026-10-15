@@ -197,33 +197,4 @@ typedef struct _DT_FRAMEBUFFER {
   CONST CHAR8 *Format;
 } DT_FRAMEBUFFER;
 
-// Returns TRUE for the display nodes whose clocks the splash needs: MDSS,
-// DPU, DSI controllers and DSI PHYs (qcom,sm8250-mdss, qcom,dsi-phy-7nm, ...).
-BOOLEAN
-DtIsDisplayNode (
-  IN CONST UINT8 *Compatible,
-  IN UINTN        Length
-);
-
-// What DtAddFramebuffer put in the node.
-typedef struct _DT_FRAMEBUFFER_NODE {
-  // Number of clock references copied.
-  UINTN Clocks;
-  // TRUE if the MDSS power-domains was copied.
-  BOOLEAN PowerDomain;
-} DT_FRAMEBUFFER_NODE;
-
-// Adds a simple-framebuffer node, /chosen/framebuffer@BASE, so simpledrm
-// keeps the splash on screen until the display driver takes over. The node
-// gets the clocks of the enabled display nodes and the MDSS power-domains,
-// so the kernel's unused-clock cleanup leaves them alone. If the node exists
-// already, as in Retroid's SM8250 trees, the properties go on it.
-DT_ERROR
-DtAddFramebuffer (
-  IN OUT UINT8            *Fdt,
-  IN UINTN                 Capacity,
-  IN CONST DT_FRAMEBUFFER *Framebuffer,
-  OUT DT_FRAMEBUFFER_NODE *Out
-);
-
 #endif
