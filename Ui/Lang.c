@@ -166,6 +166,13 @@ STATIC CONST LANG_STRINGS mEn = {
   .Unknown             = "Unknown",
   .NotInserted         = "Not inserted",
   .SrcAblScan          = "the ABL's scan",
+  .EntryType1          = "Boot Loader Spec entry",
+  .EntryUki            = "Unified kernel image",
+  .DriveInternal       = "internal drive",
+  .DriveRemovable      = "removable drive",
+  .ChipIds             = "id %u \xc2\xb7 raw 0x%x",
+  .PlatformSubtype     = "subtype %u",
+  .StorageMfr          = "mfr 0x%x",
 };
 
 STATIC CONST LANG_STRINGS mZhHans = {
@@ -309,6 +316,13 @@ STATIC CONST LANG_STRINGS mZhHans = {
   .Unknown             = "未知",
   .NotInserted         = "未插入",
   .SrcAblScan          = "ABL 的扫描",
+  .EntryType1          = "配置文件启动项（BLS）",
+  .EntryUki            = "统一内核镜像（UKI）",
+  .DriveInternal       = "内部存储",
+  .DriveRemovable      = "外置存储",
+  .ChipIds             = "编号 %u \xc2\xb7 原始值 0x%x",
+  .PlatformSubtype     = "子类型 %u",
+  .StorageMfr          = "厂商编号 0x%x",
 };
 
 STATIC CONST LANG_STRINGS *CONST mLangs[LANG_COUNT] = {

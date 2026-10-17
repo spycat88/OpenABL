@@ -768,20 +768,20 @@ AddRow (
   IN CONST CHAR8    *Id
 )
 {
-  CHAR8 *Name = BootEntriesVolumeDescribe (&mVolumes.Items[Volume]);
+  CONST BOOT_ENTRIES_VOLUME *V = &mVolumes.Items[Volume];
 
   if (*Count < MAX_ENTRIES) {
     AsciiStrCopy (Views[*Count].Title, sizeof (Views[*Count].Title), Title);
     SPrint (
-      Views[*Count].Detail, sizeof (Views[*Count].Detail), "%s%s%s \xc2\xb7 %s",
-      Version ? Version : "", Version ? " \xc2\xb7 " : "", Kind,
-      Name ? Name : ""
+      Views[*Count].Detail, sizeof (Views[*Count].Detail),
+      "%s%s%s \xc2\xb7 %s (%s)", Version ? Version : "",
+      Version ? " \xc2\xb7 " : "", Kind, V->Name ? V->Name : "",
+      V->Removable ? gStrings->DriveRemovable : gStrings->DriveInternal
     );
     Views[*Count].Bad    = Bad;
     mEntryVolume[*Count] = Volume;
     AsciiStrCopy (mEntryIds[(*Count)++], sizeof (mEntryIds[0]), Id);
   }
-  FreePool (Name);
 }
 
 // Lists what Start would try on the allowed drives, in its order: each
@@ -997,10 +997,8 @@ DeviceInfo (
       StringAppend (&Text, " v");
       VersionText (&Text, Chip.Version.Value);
     }
-    StringPrint (
-      &Text, " \xc2\xb7 id %u \xc2\xb7 raw 0x%x", Chip.Id.Value,
-      Chip.RawId.Value
-    );
+    StringAppend (&Text, " \xc2\xb7 ");
+    StringPrint (&Text, gStrings->ChipIds, Chip.Id.Value, Chip.RawId.Value);
     Push (&List, gStrings->InfoChip, StringTake (&Text));
   }
   if (QcomPlatform (&Platform)) {
@@ -1013,7 +1011,8 @@ DeviceInfo (
     }
     StringAppend (&Text, " v");
     VersionText (&Text, Platform.version);
-    StringPrint (&Text, " \xc2\xb7 subtype %u", Platform.subtype);
+    StringAppend (&Text, " \xc2\xb7 ");
+    StringPrint (&Text, gStrings->PlatformSubtype, Platform.subtype);
     if (Platform.OEMVariantID) {
       StringPrint (&Text, " \xc2\xb7 OEM %u", Platform.OEMVariantID);
     }
@@ -1048,7 +1047,7 @@ DeviceInfo (
       }
       StringPrint (&One, "%s \xc2\xb7 ", Card->Kind ? Card->Kind : "");
       if (!Card->Inquiry || !Card->Inquiry[0]) {
-        StringPrint (&One, "mfr 0x%x", Card->MfrId);
+        StringPrint (&One, gStrings->StorageMfr, Card->MfrId);
       } else {
         StringAppend (&One, Card->Inquiry);
       }

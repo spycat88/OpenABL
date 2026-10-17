@@ -156,6 +156,16 @@ typedef struct _LANG_STRINGS {
   CONST CHAR8 *Unknown;
   CONST CHAR8 *NotInserted;
   CONST CHAR8 *SrcAblScan;
+  // Boot entry kinds and drive kinds, for the entry list.
+  CONST CHAR8 *EntryType1;
+  CONST CHAR8 *EntryUki;
+  CONST CHAR8 *DriveInternal;
+  CONST CHAR8 *DriveRemovable;
+  // printf formats for the info card: every language takes the same
+  // arguments, in the same order, with the same conversions.
+  CONST CHAR8 *ChipIds;         // Id (%u), raw id (0x%x)
+  CONST CHAR8 *PlatformSubtype; // Subtype (%u)
+  CONST CHAR8 *StorageMfr;      // Manufacturer id (0x%x)
 } LANG_STRINGS;
 
 // Strings in the current language, English until LangSet.
