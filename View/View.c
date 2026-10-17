@@ -8,9 +8,9 @@
 
   Each frame describes the whole screen as microui commands, and Frame.c
   draws only what changed. A frame is made when the app changes and while
-  something moves: the countdown bar, the boot screen's sweep, and the
-  dialog and toast fading in. Lists jump to their new place instead of
-  scrolling.
+  something moves: the countdown bar, the boot screen's sweep, the dialog
+  and toast fading in, and the selected row's text when it is too long.
+  Lists jump to their new place instead of scrolling.
 */
 
 #include "View/View.h"
@@ -53,6 +53,10 @@ extern CONST UINTN gOablAssetFontCjkSize;
 #define OVERLAY_FADE_MS 120
 #define TOAST_FADE_MS   150
 #define SWEEP_MS        1100
+// Text too long for the selected row waits, scrolls to its end at this many
+// layout units a second, waits and scrolls back.
+#define MARQUEE_PAUSE_MS 1000
+#define MARQUEE_SPEED    30
 
 // The windows: the screen, and the dialog and the toast over it.
 #define WINDOW_OPTIONS                                                         \
@@ -222,6 +226,13 @@ STATIC struct {
   UINT64  ToastUntil; // the toast shown
   BOOLEAN ToastFaded;
   UINT32  ToastTick;
+  // The selected row whose text scrolls, when it started, and whether this
+  // frame drew it. A row that comes back starts over.
+  UINT32  MarqueeKey;
+  UINT32  MarqueeTick;
+  BOOLEAN MarqueeSeen;
+  // Draws the scrolling text at its start, for still pictures.
+  BOOLEAN Still;
 } mView;
 
 STATIC float
@@ -495,6 +506,72 @@ TextIn (
   );
 }
 
+// Returns how far to shift text Overflow pixels too wide to the left, for the
+// row Key. The texts of a row move together: MaxOverflow is the longest,
+// and the shorter ones wait at their end.
+STATIC INT32
+MarqueeOffset (
+  IN UINT32 Key,
+  IN INT32  Overflow,
+  IN INT32  MaxOverflow
+)
+{
+  float  Speed = ToPx (MARQUEE_SPEED) / 1000; // pixels a millisecond
+  UINT32 Move;
+  UINT32 Phase;
+  float  At;
+
+  if (Key != mView.MarqueeKey) {
+    mView.MarqueeKey  = Key;
+    mView.MarqueeTick = mView.Now;
+  }
+  mView.MarqueeSeen = TRUE;
+  if (mView.Still || MaxOverflow <= 0 || Overflow <= 0 || Speed <= 0) {
+    return 0;
+  }
+  mView.Animating = TRUE;
+  Move  = (UINT32)CeilF ((float)MaxOverflow / Speed);
+  Phase = (mView.Now - mView.MarqueeTick) % (2 * (MARQUEE_PAUSE_MS + Move));
+  if (Phase < MARQUEE_PAUSE_MS) {
+    return 0;
+  }
+  Phase -= MARQUEE_PAUSE_MS;
+  if (Phase < Move) {
+    At = (float)Phase * Speed;
+  } else if (Phase < Move + MARQUEE_PAUSE_MS) {
+    At = (float)MaxOverflow;
+  } else {
+    At = (float)MaxOverflow - (float)(Phase - Move - MARQUEE_PAUSE_MS) * Speed;
+  }
+  return Imin (Imax ((INT32)RoundF (At), 0), Overflow);
+}
+
+// Draws all of String in R like TextIn, from Offset pixels left of R's left
+// edge, clipped to R's line.
+STATIC VOID
+TextScroll (
+  IN RECT         R,
+  IN CONST CHAR8 *String,
+  IN float        Size,
+  IN FONT_WEIGHT  Weight,
+  IN UINT32       Rgb,
+  IN INT32        Offset
+)
+{
+  CONST TEXT_FONT *Font     = TextFont (ToPx (Size), Weight);
+  float            Baseline = CenterY (R) + FontCapHeight (ToPx (Size)) / 2;
+  INT32            W        = TextWidth (Font, String, MAX_UINTN);
+
+  Line (
+    mu_rect (
+      R.X, (INT32)RoundF (Baseline) - (Font->LineH - Font->Base),
+      Imax (R.W, 1), Font->LineH
+    ),
+    R.X - Offset, W, Baseline, Font, String, AsciiStrLen (String), Rgb,
+    ALIGN_LEFT
+  );
+}
+
 STATIC float
 Measure (
   IN CONST CHAR8 *String,
@@ -744,21 +821,54 @@ RowItem (
     );
     RightX -= ToPx (13 + 8);
   }
-  float TextX = Pad + ToPx (25);
+  float TextX     = Pad + ToPx (25);
+  RECT  ValueBox  = {0};
+  float ValueFull = 0;
   if (Value && *Value) {
-    float ValueW = Measure (Value, 12.5f, FONT_WEIGHT_REGULAR);
-    ValueW       = CeilF (ValueW < W * 0.45f ? ValueW : W * 0.45f) + 1;
-    TextIn (
-      Rectf (X + RightX - ValueW, (float)Row.Y, ValueW, (float)Row.H), Value,
-      12.5f, FONT_WEIGHT_REGULAR, ValueColor, ALIGN_RIGHT
-    );
+    ValueFull    = Measure (Value, 12.5f, FONT_WEIGHT_REGULAR);
+    float ValueW = CeilF (ValueFull < W * 0.45f ? ValueFull : W * 0.45f) + 1;
+    ValueBox = Rectf (X + RightX - ValueW, (float)Row.Y, ValueW, (float)Row.H);
     RightX -= ValueW + ToPx (8);
   }
-  float LabelW = RightX - TextX;
-  TextIn (
-    Rectf (X + TextX, (float)Row.Y, LabelW > 0 ? LabelW : 0, (float)Row.H),
-    Label, 14.5f, FONT_WEIGHT_REGULAR, Foreground, ALIGN_LEFT
-  );
+  float LabelW   = RightX - TextX;
+  RECT  LabelBox =
+    Rectf (X + TextX, (float)Row.Y, LabelW > 0 ? LabelW : 0, (float)Row.H);
+
+  // The selected row scrolls what doesn't fit instead of cutting it short.
+  INT32 LabelOver = 0;
+  INT32 ValueOver = 0;
+  if (Selected) {
+    LabelOver = Imax (
+      (INT32)Measure (Label, 14.5f, FONT_WEIGHT_REGULAR) - LabelBox.W, 0
+    );
+    if (Value && *Value) {
+      ValueOver = Imax ((INT32)ValueFull - ValueBox.W, 0);
+    }
+  }
+  INT32  MaxOver = Imax (LabelOver, ValueOver);
+  UINT32 Key =
+    DigestStr (DigestStr (2166136261u, Label), Value ? Value : "");
+
+  if (Value && *Value) {
+    if (ValueOver) {
+      TextScroll (
+        ValueBox, Value, 12.5f, FONT_WEIGHT_REGULAR, ValueColor,
+        MarqueeOffset (Key, ValueOver, MaxOver)
+      );
+    } else {
+      TextIn (
+        ValueBox, Value, 12.5f, FONT_WEIGHT_REGULAR, ValueColor, ALIGN_RIGHT
+      );
+    }
+  }
+  if (LabelOver) {
+    TextScroll (
+      LabelBox, Label, 14.5f, FONT_WEIGHT_REGULAR, Foreground,
+      MarqueeOffset (Key, LabelOver, MaxOver)
+    );
+  } else {
+    TextIn (LabelBox, Label, 14.5f, FONT_WEIGHT_REGULAR, Foreground, ALIGN_LEFT);
+  }
 }
 
 // Header and footer
@@ -2032,11 +2142,12 @@ Build (IN OUT APP *A)
   SCREEN  Screen  = A->Screen == SCREEN_CONFIRM ? SCREEN_MENU : A->Screen;
   BOOLEAN WithBar = Screen == SCREEN_MENU && A->Countdown;
 
-  mView.App       = A;
-  mView.Now       = mView.Clock ();
-  mView.LastFrame = mView.Now;
-  mView.Animating = FALSE;
-  mView.Alpha     = 255;
+  mView.App         = A;
+  mView.Now         = mView.Clock ();
+  mView.LastFrame   = mView.Now;
+  mView.Animating   = FALSE;
+  mView.Alpha       = 255;
+  mView.MarqueeSeen = FALSE;
   FrameSize (&W, &H);
   if (W != mView.W || H != mView.H || A->Scheme != mView.Scheme ||
       !mView.Laid) {
@@ -2127,6 +2238,9 @@ Build (IN OUT APP *A)
     mView.Alpha = 255;
     mu_end_window (mView.Ctx);
   }
+  if (!mView.MarqueeSeen) {
+    mView.MarqueeKey = 0;
+  }
   FrameEnd ();
 }
 
@@ -2203,9 +2317,11 @@ ViewSettle (VOID)
   // Finish the fades so still pictures show where they end.
   mView.OverlayFaded = TRUE;
   mView.ToastFaded   = TRUE;
+  mView.Still        = TRUE;
   if (mView.App) {
     Build (mView.App);
   }
+  mView.Still = FALSE;
   FrameDraw (FALSE);
 }
 
