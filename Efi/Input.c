@@ -11,6 +11,9 @@
 
 #include "Efi/Efi.h"
 
+#include "Core/Gamepad.h"
+#include "Efi/Gamepad.h"
+
 // Reads the next key the UI uses, skipping others. Returns FALSE when none
 // is waiting, the read fails, or the character is a UTF-16 surrogate.
 STATIC BOOLEAN
@@ -68,6 +71,78 @@ InputKeysHeldAtStart (IN INPUT_KEYS *Keys)
   return ReadKey (&Key);
 }
 
+// The input a gamepad button gives, FALSE for none.
+STATIC BOOLEAN
+PadInput (
+  IN UINT16 Button,
+  OUT INPUT *Out
+)
+{
+  switch (Button) {
+  case GAMEPAD_UP:
+    *Out = INPUT_UP;
+    return TRUE;
+  case GAMEPAD_DOWN:
+    *Out = INPUT_DOWN;
+    return TRUE;
+  case GAMEPAD_RIGHT:
+  case GAMEPAD_EAST:
+    *Out = INPUT_SELECT;
+    return TRUE;
+  case GAMEPAD_LEFT:
+  case GAMEPAD_SOUTH:
+    *Out = INPUT_BACK;
+    return TRUE;
+  case GAMEPAD_START:
+    *Out = INPUT_START;
+    return TRUE;
+  case GAMEPAD_SELECT:
+    *Out = INPUT_MODELS;
+    return TRUE;
+  }
+  return FALSE;
+}
+
+// Reports the gamepad's button to its decoder. A newly pressed button takes
+// over from one still held; a release is seen at once, so a quick second
+// press is a new input, not a repeat.
+STATIC VOID
+PollPad (
+  IN OUT INPUT_KEYS   *Keys,
+  IN UINT64            Now,
+  IN OUT INPUT_EVENTS *Out
+)
+{
+  UINT16 Held;
+  UINT16 Pressed;
+  UINT16 Button = 0;
+  INPUT  Key;
+  INPUT  Decoded;
+
+  if (!GamepadPoll (Now, &Held)) {
+    return;
+  }
+  Pressed = Held & ~Keys->PadHeld;
+  for (UINT16 Bit = 1; Bit && !Button; Bit <<= 1) {
+    if ((Pressed & Bit) && PadInput (Bit, &Key)) {
+      Button = Bit;
+    }
+  }
+  if (!Button && (Held & Keys->PadButton)) {
+    Button = Keys->PadButton;
+  }
+  Keys->PadHeld = Held;
+  if (Button != Keys->PadButton) {
+    Keys->Pad.Held  = FALSE;
+    Keys->PadButton = Button;
+  }
+  // The input is lost if memory runs out.
+  if (Button && PadInput (Button, &Key) &&
+      KeysPress (&Keys->Pad, Key, Now, &Decoded)) {
+    (VOID)VecPush (Out, Decoded);
+  }
+}
+
 VOID
 InputKeysPoll (
   IN OUT INPUT_KEYS   *Keys,
@@ -89,4 +164,5 @@ InputKeysPoll (
   if (!Any) {
     KeysIdle (&Keys->Decoder, Now);
   }
+  PollPad (Keys, Now, Out);
 }

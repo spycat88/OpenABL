@@ -30,7 +30,17 @@ typedef struct _DEVICE_INFO {
 
 // Input and commands
 
-typedef enum { INPUT_UP, INPUT_DOWN, INPUT_SELECT, INPUT_BACK } INPUT;
+// Start and Models are shortcuts on the menu screen, from a gamepad's Start
+// and Select buttons: Start starts the boot mode, Models opens the device
+// model list. Other screens ignore them.
+typedef enum {
+  INPUT_UP,
+  INPUT_DOWN,
+  INPUT_SELECT,
+  INPUT_BACK,
+  INPUT_START,
+  INPUT_MODELS
+} INPUT;
 
 // How the user drives the menu. It only changes the footer hints.
 typedef enum {

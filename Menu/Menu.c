@@ -19,6 +19,7 @@
 #include "Efi/Efi.h"
 #include "Efi/DefaultFiles.h"
 #include "Efi/Display.h"
+#include "Efi/Gamepad.h"
 #include "Efi/Input.h"
 #include "Efi/Models.h"
 #include "Efi/Qcom.h"
@@ -1634,6 +1635,9 @@ MenuRun (
   gST->ConOut->EnableCursor (gST->ConOut, FALSE);
   // Ignore a key still held from opening the menu.
   InputKeysHeldAtStart (&Keys);
+  // Approved models only. A model picked in the menu takes effect when the
+  // menu next opens.
+  (VOID)GamepadOpen (M.Stored.Model, gMenuEfiLog);
   ViewRotate (Rotation);
   mApp.Dirty = TRUE;
 
@@ -1678,6 +1682,7 @@ MenuRun (
     if (Pending.Count) {
       ViewSettle ();
       if (RunCommand (&M, NextPending (&Pending))) {
+        GamepadClose ();
         ViewDone ();
         return (MENU_END){MENU_END_START_HERE, EFI_ABORTED};
       }
@@ -1690,6 +1695,7 @@ MenuRun (
       Status = MenuHostPoll (&M.Host);
       if (Status != EFI_SUCCESS) {
         MenuLog ("the ABL asked to leave (%s)", MENU_STATUS (Status));
+        GamepadClose ();
         ViewDone ();
         return (MENU_END){MENU_END_LEFT, Status};
       }
