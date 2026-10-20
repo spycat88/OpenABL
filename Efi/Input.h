@@ -10,6 +10,12 @@
   are Back, and Enter, Space and SCAN_SUSPEND (the power key on Qualcomm
   keypads) are Select. Other keys are ignored. Repeat and hold timing is
   left to the UI's key decoder (Ui/Ui.h).
+
+  With the gamepad open (Efi/Gamepad.h), d-pad up and down are Up and Down,
+  right and A (the east button) are Select, left and B (the south button)
+  are Back, Start is Start and Select is Models. X and Y do nothing. The
+  gamepad has a decoder of its own; the last button pressed of those held
+  is the one reported.
 */
 
 #ifndef __EFI_INPUT_H__
@@ -22,6 +28,11 @@
 
 typedef struct _INPUT_KEYS {
   KEYS Decoder;
+  // The gamepad's decoder, its buttons at the last poll, and the button it
+  // reports (0 for none).
+  KEYS   Pad;
+  UINT16 PadHeld;
+  UINT16 PadButton;
 } INPUT_KEYS;
 
 typedef struct _INPUT_EVENTS OABL_VEC (INPUT) INPUT_EVENTS;
@@ -37,8 +48,9 @@ InputKeysNew (VOID)
 BOOLEAN
 InputKeysHeldAtStart (IN INPUT_KEYS *Keys);
 
-// Feeds every waiting key through the decoder at time Now (ms) and appends
-// the resulting inputs to Out. Caller frees Out with VecFree.
+// Feeds every waiting key, and the gamepad's buttons if it is open, through
+// the decoders at time Now (ms) and appends the resulting inputs to Out.
+// Caller frees Out with VecFree.
 VOID
 InputKeysPoll (
   IN OUT INPUT_KEYS   *Keys,

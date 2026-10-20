@@ -915,6 +915,10 @@ MenuInput (
     }
   }
   switch (Input) {
+  // AppInput acts on these itself.
+  case INPUT_START:
+  case INPUT_MODELS:
+    return None ();
   case INPUT_UP:
     A->FocusItem = Items[(Focused + Count - 1) % Count];
     return None ();
@@ -941,6 +945,10 @@ InfoInput (
   UINTN Focus = A->InfoList.Focus;
 
   switch (Input) {
+  // AppInput acts on these itself.
+  case INPUT_START:
+  case INPUT_MODELS:
+    return None ();
   case INPUT_UP:
     A->InfoList.Focus = (Focus + Count - 1) % Count;
     break;
@@ -974,6 +982,10 @@ ModelsInput (
   UINTN Focus = A->ModelList.Focus;
 
   switch (Input) {
+  // AppInput acts on these itself.
+  case INPUT_START:
+  case INPUT_MODELS:
+    return None ();
   case INPUT_UP:
     A->ModelList.Focus = (Focus + Count - 1) % Count;
     break;
@@ -1028,6 +1040,10 @@ EntriesInput (
   UINTN Focus = A->EntryList.Focus;
 
   switch (Input) {
+  // AppInput acts on these itself.
+  case INPUT_START:
+  case INPUT_MODELS:
+    return None ();
   case INPUT_UP:
     A->EntryList.Focus = (Focus + Count - 1) % Count;
     break;
@@ -1058,6 +1074,10 @@ ConfirmInput (
 )
 {
   switch (Input) {
+  // AppInput acts on these itself.
+  case INPUT_START:
+  case INPUT_MODELS:
+    return None ();
   case INPUT_UP:
   case INPUT_DOWN:
     A->ConfirmYes = !A->ConfirmYes;
@@ -1092,6 +1112,16 @@ AppInput (
 )
 {
   A->Dirty = TRUE;
+  if (Input == INPUT_START || Input == INPUT_MODELS) {
+    // Start during the countdown starts at once. Models needs the Device
+    // model item to be shown.
+    if (A->Screen != SCREEN_MENU ||
+        (Input == INPUT_MODELS && !SettingsModelVisible (&A->Settings))) {
+      return None ();
+    }
+    A->Countdown = FALSE;
+    return Input == INPUT_START ? BeginBoot (A) : AppOpenModels (A);
+  }
   if (A->Countdown) {
     // The first press only stops the countdown.
     A->Countdown = FALSE;

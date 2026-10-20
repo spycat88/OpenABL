@@ -41,6 +41,12 @@ At power-on:
 
 In the menu, Volume Up and Down move the selection and Power selects.
 
+On a Retroid Pocket Nova with *Device model* set to it, the built-in
+controls also work in the menu: the d-pad moves up and down, Right and A
+select, Left and B go back, Start starts the boot mode and Select opens
+*Device model*. They take effect the next time the menu opens after the
+model is chosen.
+
 | Item | What it does |
 |---|---|
 | Start | Boots the current boot mode (*Start Linux* or *Start Android*). |
