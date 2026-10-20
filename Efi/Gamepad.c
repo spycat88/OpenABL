@@ -107,7 +107,12 @@
 #define RCG_DFS_LEVELS      8
 #define RCG_MND_MASK        0xffff
 #define RCG_HID_MASK        0x1f
-#define BRANCH_CLK_OFF      (1u << 31)
+// Branch CBCR: hardware gating (as hwcg_bit in gcc-sm8550.c), the clock's
+// off status, and the NOC FSM state (2 is on).
+#define BRANCH_HW_CTL        (1u << 1)
+#define BRANCH_CLK_OFF       (1u << 31)
+#define BRANCH_NOC_FSM_SHIFT 28
+#define BRANCH_NOC_FSM_ON    2
 
 // TLMM: one 4 KiB block per GPIO, its control register then its I/O
 // register.
@@ -193,6 +198,30 @@ WaitFor (
 
 // Clocks
 
+// Waits for the branch at Cbcr to run, as clk_branch2's enable does. A
+// branch in hardware gating mode is off while idle, so it isn't waited for.
+STATIC BOOLEAN
+BranchOn (IN UINT64 Cbcr)
+{
+  UINT64 Until = ClockNowUs () + WAIT_US;
+
+  for (;;) {
+    UINT32 Value = Read (Cbcr);
+
+    if ((Value & BRANCH_HW_CTL) || !(Value & BRANCH_CLK_OFF) ||
+        ((Value >> BRANCH_NOC_FSM_SHIFT) & 7) == BRANCH_NOC_FSM_ON) {
+      return TRUE;
+    }
+    if (ClockNowUs () >= Until) {
+      LogPrint (
+        mPad.Log, "gamepad: clock branch 0x%llx stays off (0x%08x)",
+        Cbcr, Value
+      );
+      return FALSE;
+    }
+  }
+}
+
 // Turns on the vote bits that were off and waits for every branch.
 STATIC BOOLEAN
 ClocksOn (IN CONST GAMEPAD_BOARD *B)
@@ -205,11 +234,7 @@ ClocksOn (IN CONST GAMEPAD_BOARD *B)
   for (UINTN Index = 0;
        Index < sizeof (B->ClockBranches) / sizeof (*B->ClockBranches);
        Index++) {
-    if (!WaitFor (B->Gcc + B->ClockBranches[Index], BRANCH_CLK_OFF, 0)) {
-      LogPrint (
-        mPad.Log, "gamepad: clock branch 0x%x stays off",
-        B->ClockBranches[Index]
-      );
+    if (!BranchOn (B->Gcc + B->ClockBranches[Index])) {
       return FALSE;
     }
   }

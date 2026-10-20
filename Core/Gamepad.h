@@ -104,8 +104,8 @@ typedef struct _GAMEPAD_BOARD {
   UINT32 ChipIds[4];
   UINT64 Gcc;
   // The apps clock vote register, the bits that turn on the serial engine
-  // and its QUP wrapper, and each clock's branch register (bit 31 is set
-  // while it is off).
+  // and its QUP wrapper, and each clock's branch register, waited on until
+  // the clock runs.
   UINT32 ClockVote;
   UINT32 ClockVoteBits;
   UINT32 ClockBranches[5];
