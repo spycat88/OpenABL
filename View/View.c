@@ -1843,15 +1843,19 @@ STATIC VOID
 OverlayDraw (IN CONST APP *A)
 {
   BOOLEAN      Final  = A->Confirm == CONFIRM_UNINSTALL_FINAL;
-  BOOLEAN      Danger = A->Confirm == CONFIRM_UNINSTALL || Final;
+  BOOLEAN      Reset  = A->Confirm == CONFIRM_RESET_SETTINGS;
+  BOOLEAN      Danger = A->Confirm == CONFIRM_UNINSTALL || Final || Reset;
   ICON         CardIcon = Danger ? ICON_TRASH : ICON_CPU;
-  CONST CHAR8 *Title   = Final  ? gStrings->ConfirmUninstallFinalTitle
+  CONST CHAR8 *Title   = Final   ? gStrings->ConfirmUninstallFinalTitle
+                         : Reset  ? gStrings->ConfirmResetTitle
                          : Danger ? gStrings->ConfirmUninstallTitle
                                   : gStrings->ConfirmEdlTitle;
-  CONST CHAR8 *Message = Final  ? gStrings->ConfirmUninstallFinalMsg
+  CONST CHAR8 *Message = Final   ? gStrings->ConfirmUninstallFinalMsg
+                         : Reset  ? gStrings->ConfirmResetMsg
                          : Danger ? gStrings->ConfirmUninstallMsg
                                   : gStrings->ConfirmEdlMsg;
-  CONST CHAR8 *Confirm = Final  ? gStrings->ConfirmUninstallFinal
+  CONST CHAR8 *Confirm = Final   ? gStrings->ConfirmUninstallFinal
+                         : Reset  ? gStrings->ConfirmReset
                          : Danger ? gStrings->ConfirmUninstall
                                   : gStrings->ConfirmEdl;
   UINTN        Parts =

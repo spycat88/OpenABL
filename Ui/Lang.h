@@ -78,6 +78,7 @@ typedef struct _LANG_STRINGS {
   CONST CHAR8 *DbgUsbLive;
   CONST CHAR8 *DbgQuiesce;
   CONST CHAR8 *DbgPanelLines;
+  CONST CHAR8 *DbgResetSettings;
   CONST CHAR8 *InfoChip;
   CONST CHAR8 *InfoPlatform;
   CONST CHAR8 *InfoPmic;
@@ -131,6 +132,10 @@ typedef struct _LANG_STRINGS {
   CONST CHAR8 *ConfirmEdlTitle;
   CONST CHAR8 *ConfirmEdlMsg;
   CONST CHAR8 *ConfirmEdl;
+  CONST CHAR8 *ConfirmResetTitle;
+  CONST CHAR8 *ConfirmResetMsg;
+  CONST CHAR8 *ConfirmReset;
+  CONST CHAR8 *ResetFailed;
   CONST CHAR8 *Cancel;
   CONST CHAR8 *AblSettingFailed;
   CONST CHAR8 *AblModelFailed;

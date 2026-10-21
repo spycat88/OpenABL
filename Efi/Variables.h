@@ -61,6 +61,18 @@ VariablesChargerScreenToDevinfo (IN LOG_SINK Log);
 VOID
 VariablesMoveOutOfDevinfo (IN LOG_SINK Log);
 
+#ifdef OABL_DEBUG
+
+// Deletes every setting variable, flushes, then clears the settings'
+// devinfo values (the packed copy and the older ABLs' values), so the next
+// boot starts as on a newly flashed device. The charger screen flag is left
+// for that boot's move out of devinfo, which turns it on. Returns the first
+// failure, and still clears what it can.
+EFI_STATUS
+VariablesReset (IN LOG_SINK Log);
+
+#endif
+
 #ifdef OABL_DEVINFO_SETTINGS
 
 // Packs the variables into devinfo, in place of a flush where XBL has no

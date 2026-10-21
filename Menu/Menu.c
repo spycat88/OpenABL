@@ -1440,6 +1440,19 @@ RunCommand (
 #endif
     break;
   }
+  case COMMAND_RESET_SETTINGS: {
+#ifdef OABL_DEBUG
+    if (EFI_ERROR (VariablesReset (gMenuEfiLog))) {
+      AppOnFailed (&mApp, gStrings->ResetFailed);
+      break;
+    }
+    // A cold restart, so this boot's settings can't be written back and the
+    // next boot starts as on a newly flashed device.
+    MenuLog ("reset: restarting");
+    gRT->ResetSystem (EfiResetCold, EFI_SUCCESS, 0, NULL);
+#endif
+    break;
+  }
   case COMMAND_LOG: {
     OABL_BUFFER Raw   = {0};
     CHAR8     **Lines = AllocateZeroArray (LOG_LINES, sizeof (*Lines));

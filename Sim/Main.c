@@ -321,6 +321,20 @@ SConfirmEdl (
   AppInput (A, INPUT_DOWN);
 }
 
+// The Debug section's reset card, as debug builds show it.
+STATIC VOID
+SConfirmReset (
+  IN OUT APP *A,
+  IN UINT64   Now
+)
+{
+  (VOID)Now;
+  A->Debug      = TRUE;
+  A->Screen     = SCREEN_CONFIRM;
+  A->Confirm    = CONFIRM_RESET_SETTINGS;
+  A->ConfirmYes = FALSE;
+}
+
 STATIC VOID
 SBooting (
   IN OUT APP *A,
@@ -446,6 +460,7 @@ STATIC CONST struct {
   {"confirm-uninstall", SConfirmUninstall},
   {"confirm-uninstall-final", SConfirmUninstallFinal},
   {"confirm-edl", SConfirmEdl},
+  {"confirm-reset", SConfirmReset},
   {"booting", SBooting},
   {"error-no-image", SErrorNoImage},
   {"error-model", SErrorModel},

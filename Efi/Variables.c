@@ -319,6 +319,90 @@ Done:
   BufferFree (&Raw);
 }
 
+#ifdef OABL_DEBUG
+
+// Every variable OpenABL stores under its vendor GUID.
+STATIC CONST CHAR8 *CONST mAllKeys[] = {
+  SETTINGS_KEY_BOOT_MODE,
+  SETTINGS_KEY_ABL_MODE,
+  SETTINGS_KEY_ALT_VOLUME_UP,
+  SETTINGS_KEY_BOOT_SOURCE,
+  SETTINGS_KEY_OFFMODE_CHARGING,
+  SETTINGS_KEY_ROTATION,
+  SETTINGS_KEY_MENU_TIMEOUT,
+  SETTINGS_KEY_MODEL,
+  SETTINGS_KEY_MODEL_ROTATION,
+  SETTINGS_KEY_MODEL_ROTATION_FOR,
+  SETTINGS_KEY_SHOW_MODEL_MENU,
+  SETTINGS_KEY_BOOT_FAILURE,
+  SETTINGS_KEY_DISPLAY_QUIESCE,
+  SETTINGS_KEY_CUSTOM_LOGO,
+  SETTINGS_KEY_LANGUAGE,
+  SETTINGS_KEY_USB_HOST_LIVE,
+  // Boot entries' pick for the next Start (MENU_PICK_VAR).
+  "BootEntryOnce",
+  // Last, so a reset cut short still moves out of devinfo at the next boot.
+  SETTINGS_KEY_SCHEMA,
+};
+
+EFI_STATUS
+VariablesReset (IN LOG_SINK Log)
+{
+  CONST CHAR8 *Names
+    [1 + SETTINGS_STORE_MODEL_ENTRIES + DEVINFO_LEGACY_SETTINGS_LEN +
+     DEVINFO_LEGACY_ONLY_LEN];
+  OABL_BUFFER Raw;
+  UINTN       Count  = 0;
+  UINTN       Failed = 0;
+  EFI_STATUS  Result = EFI_SUCCESS;
+  EFI_STATUS  Status;
+
+  for (UINTN Index = 0; Index < sizeof (mAllKeys) / sizeof (*mAllKeys);
+       Index++) {
+    Status = VariablesPut (mAllKeys[Index], NULL, 0);
+    if (Status != EFI_SUCCESS) {
+      LogPrint (
+        Log, "reset: deleting %s: %s", mAllKeys[Index], STATUS_TEXT (Status)
+      );
+      Result = Result == EFI_SUCCESS ? Status : Result;
+      Failed++;
+    }
+  }
+  // Without variable services this writes devinfo's copy, cleared below.
+  if (QcomFlushVariables (&Status) && EFI_ERROR (Status)) {
+    LogPrint (Log, "reset: flushing: %s", STATUS_TEXT (Status));
+    Result = Result == EFI_SUCCESS ? Status : Result;
+  }
+  // Read devinfo after the flush, which may have written it.
+  if (!ReadDevinfo (&Raw)) {
+    LogPrint (Log, "reset: devinfo unreadable: its values stay");
+    return Result;
+  }
+  Names[Count++] = SETTINGS_STORE_ENTRY;
+  for (UINTN Index = 0; Index < SETTINGS_STORE_MODEL_ENTRIES; Index++) {
+    Names[Count++] = gSettingsStoreModelEntries[Index];
+  }
+  for (UINTN Index = 0; Index < DEVINFO_LEGACY_SETTINGS_LEN; Index++) {
+    Names[Count++] = gDevInfoLegacySettings[Index].Name;
+  }
+  for (UINTN Index = 0; Index < DEVINFO_LEGACY_ONLY_LEN; Index++) {
+    Names[Count++] = gDevInfoLegacyOnly[Index];
+  }
+  if (DevInfoClearValues (Raw.Data, Raw.Len, Names, Count) &&
+      QcomWriteDeviceState (Raw.Data, Raw.Len, &Status) &&
+      EFI_ERROR (Status)) {
+    LogPrint (Log, "reset: clearing devinfo: %s", STATUS_TEXT (Status));
+    Result = Result == EFI_SUCCESS ? Status : Result;
+  }
+  BufferFree (&Raw);
+  LogPrint (
+    Log, "reset: settings cleared (%llu variable(s) failed)", (UINT64)Failed
+  );
+  return Result;
+}
+
+#endif
+
 #ifdef OABL_DEVINFO_SETTINGS
 
 // VariablesGet as Core/Settings' SETTINGS_GET.

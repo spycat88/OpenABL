@@ -75,6 +75,7 @@ typedef enum {
   COMMAND_DEVICE_INFO,
   COMMAND_LOG,
   COMMAND_SAVE_EXPERIMENTS, // saves Experiments
+  COMMAND_RESET_SETTINGS,   // clears every stored setting, then restarts
 } COMMAND_KIND;
 
 // Work for the platform. Run it after the next frame, so the screen
@@ -160,6 +161,7 @@ typedef enum {
   ITEM_USB_LIVE,
   ITEM_QUIESCE,
   ITEM_PANEL_LINES,
+  ITEM_RESET_SETTINGS,
   ITEM_POWER_OFF,
 } ITEM;
 
@@ -199,7 +201,8 @@ typedef enum {
 typedef enum {
   CONFIRM_UNINSTALL,
   CONFIRM_UNINSTALL_FINAL,
-  CONFIRM_EDL
+  CONFIRM_EDL,
+  CONFIRM_RESET_SETTINGS
 } CONFIRM;
 
 // Scroll is the first row the list shows.

@@ -553,6 +553,7 @@ AppRows (
     }
     ADD_ITEM (ITEM_QUIESCE);
     ADD_ITEM (ITEM_PANEL_LINES);
+    ADD_ITEM (ITEM_RESET_SETTINGS);
   }
   ADD_HEADER (gStrings->SectionSystem);
   if (Caps->Log) {
@@ -794,6 +795,12 @@ AppItemView (
     AsciiStrCopy (Value, Cap, On ? gStrings->On : gStrings->Off);
     break;
   }
+  case ITEM_RESET_SETTINGS:
+    View->Icon     = ICON_TRASH;
+    View->Label    = gStrings->DbgResetSettings;
+    View->Tone     = TONE_DANGER;
+    View->Trailing = TRAILING_NAVIGATE;
+    break;
   case ITEM_POWER_OFF:
     View->Icon     = ICON_POWER;
     View->Label    = gStrings->PowerOff;
@@ -891,6 +898,11 @@ Activate (
     Save.Experiments = *Experiments;
     return Save;
   }
+  case ITEM_RESET_SETTINGS:
+    A->Screen     = SCREEN_CONFIRM;
+    A->Confirm    = CONFIRM_RESET_SETTINGS;
+    A->ConfirmYes = FALSE;
+    return None ();
   case ITEM_POWER_OFF:
     return Command (COMMAND_POWER_OFF, 0);
   }
@@ -1099,6 +1111,9 @@ ConfirmInput (
     if (A->Confirm == CONFIRM_UNINSTALL_FINAL) {
       A->Screen = SCREEN_UNINSTALLING;
       return Command (COMMAND_UNINSTALL_CFW, 0);
+    }
+    if (A->Confirm == CONFIRM_RESET_SETTINGS) {
+      return Command (COMMAND_RESET_SETTINGS, 0);
     }
     return Command (COMMAND_REBOOT, REBOOT_EDL);
   }
