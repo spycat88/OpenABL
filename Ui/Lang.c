@@ -20,11 +20,13 @@ _Static_assert (sizeof (LANG_STRINGS) % sizeof (CONST CHAR8 *) == 0, "strings");
 
 extern CONST LANG_STRINGS gLangEn;
 extern CONST LANG_STRINGS gLangZhHans;
+extern CONST LANG_STRINGS gLangKo;
 
 // Indexed by LANG_ID.
 STATIC CONST LANG_STRINGS *CONST mLangs[LANG_COUNT] = {
   [LANG_EN]      = &gLangEn,
   [LANG_ZH_HANS] = &gLangZhHans,
+  [LANG_KO]      = &gLangKo,
 };
 
 // The current language, with English in place of any string it lacks.

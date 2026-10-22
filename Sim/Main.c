@@ -6,7 +6,7 @@
 /**
   Main - renders the menu's screens to PNG on the host.
 
-    openabl-menu-sim [--out DIR] [--filter TEXT] [--lang en|zh-hans] [--check]
+    openabl-menu-sim [--out DIR] [--filter TEXT] [--lang en|zh-hans|ko] [--check]
 
   For every panel and rotation it writes the main menu as the user sees it
   (*-view.png) and as the panel receives it (*-scanout.png, rotated). A few
@@ -200,6 +200,7 @@ STATIC UINT8 mLanguage = LANG_EN;
 STATIC CONST CHAR8 *CONST mLangTags[LANG_COUNT] = {
   [LANG_EN]      = "en",
   [LANG_ZH_HANS] = "zh-hans",
+  [LANG_KO]      = "ko",
 };
 
 // Returns the LANG_ID tagged Tag, or LANG_COUNT if none is.
@@ -1022,7 +1023,7 @@ main (
     } else {
       fprintf (
         stderr,
-        "usage: %s [--out DIR] [--filter TEXT] [--lang en|zh-hans] [--check]\n",
+        "usage: %s [--out DIR] [--filter TEXT] [--lang en|zh-hans|ko] [--check]\n",
         Argv[0]
       );
       return 2;

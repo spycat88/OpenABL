@@ -7,6 +7,7 @@ Each of the menu's languages is one C file here that fills in a
 | ----------- | ------------------- | -------------- |
 | `En.c`      | English             | `LANG_EN`      |
 | `ZhHans.c`  | Simplified Chinese  | `LANG_ZH_HANS` |
+| `Ko.c`      | Korean              | `LANG_KO`      |
 
 English is the reference: any string a language leaves out is shown in
 English, so a partial translation still works.

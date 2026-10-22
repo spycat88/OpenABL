@@ -120,8 +120,8 @@ order:
 **Android** boots from the device's own boot partitions, the same way as
 with Qualcomm's ABL, including verified boot and recovery.
 
-The menu is in English and Simplified Chinese (简体中文), chosen with the
-Language setting. Each language is one file in `Ui/Lang/`;
+The menu is in English, Simplified Chinese (简体中文) and Korean (한국어),
+chosen with the Language setting. Each language is one file in `Ui/Lang/`;
 [Ui/Lang/README.md](Ui/Lang/README.md) explains adding one.
 
 ## Building
