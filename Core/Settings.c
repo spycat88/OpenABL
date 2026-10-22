@@ -134,12 +134,6 @@ SettingsNextTimeout (IN OUT SETTINGS *Settings)
   Settings->MenuTimeoutS = gSettingsTimeoutChoices[(Index + 1) % Count];
 }
 
-VOID
-SettingsNextLanguage (IN OUT SETTINGS *Settings)
-{
-  Settings->Language = (UINT8)((Settings->Language + 1) % SETTINGS_LANGUAGES);
-}
-
 CONST CHAR8 *
 SettingsAltVolumeLabel (IN CONST SETTINGS *Settings)
 {

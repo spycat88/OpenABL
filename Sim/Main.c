@@ -466,6 +466,18 @@ SEntries (
   AppInput (A, INPUT_DOWN);
 }
 
+STATIC VOID
+SLanguages (
+  IN OUT APP *A,
+  IN UINT64   Now
+)
+{
+  (VOID)Now;
+  A->FocusItem = ITEM_LANGUAGE;
+  AppInput (A, INPUT_SELECT);
+  AppInput (A, INPUT_DOWN);
+}
+
 STATIC CONST struct {
   CONST CHAR8  *Name;
   SESSION_SETUP Setup;
@@ -489,6 +501,7 @@ STATIC CONST struct {
   {"toast", SToast},
   {"menu-entries", SMenuEntries},
   {"entries", SEntries},
+  {"languages", SLanguages},
 };
 
 STATIC APP mApp;
@@ -635,6 +648,12 @@ STATIC CONST STEP mSessionHeldLines[] = {
   {STEP_WAIT, 0, 600}};
 
 #define FRESH {STEP_FRESH, 0, 0}
+// Opens Language (the fifth item), moves, picks the next language, then
+// opens it again and backs out.
+STATIC CONST STEP mSessionLanguages[] = {
+  PRESS (DOWN, 4), PRESS (SELECT, 1), PRESS (DOWN, 5),   PRESS (UP, 3),
+  FRESH,           PRESS (SELECT, 1), {STEP_WAIT, 0, 600}, FRESH,
+  PRESS (SELECT, 1), PRESS (UP, 1),   PRESS (BACK, 1),   FRESH};
 STATIC CONST STEP mSessionPaths[] = {FRESH,
                                      {STEP_SCAN, 0, 1},
                                      FRESH,
@@ -720,6 +739,7 @@ STATIC CONST struct {
 #define SESSION(Name, Steps) {Name, Steps, sizeof (Steps) / sizeof (Steps[0])}
   SESSION ("menu", mSessionMenu),
   SESSION ("models", mSessionModels),
+  SESSION ("languages", mSessionLanguages),
   SESSION ("lines", mSessionLines),
   SESSION ("confirm", mSessionConfirm),
   SESSION ("toast", mSessionToast),

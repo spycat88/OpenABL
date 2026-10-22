@@ -693,6 +693,7 @@ AppItemView (
     View->Icon  = ICON_SWITCH;
     View->Label = gStrings->Language;
     AsciiStrCopy (Value, Cap, LangName (Settings->Language));
+    View->Trailing = TRAILING_NAVIGATE;
     break;
   case ITEM_BOOT_MODE:
     View->Icon  = ICON_FORK;
@@ -840,9 +841,9 @@ Activate (
     A->ConfirmYes = FALSE;
     return None ();
   case ITEM_LANGUAGE:
-    SettingsNextLanguage (Settings);
-    LangSet (Settings->Language);
-    return Command (COMMAND_SAVE_SETTINGS, 0);
+    A->Screen   = SCREEN_LANGUAGES;
+    A->LangList = (LIST_STATE){.Focus = LangPosition (Settings->Language)};
+    return None ();
   case ITEM_BOOT_MODE:
     if (!A->Caps.Android) {
       ShowToast (A, gStrings->ToastAndroidInAbl);
@@ -1077,6 +1078,49 @@ EntriesInput (
   return None ();
 }
 
+STATIC VOID
+LeaveLanguages (IN OUT APP *A)
+{
+  A->Screen    = SCREEN_MENU;
+  A->FocusItem = ITEM_LANGUAGE;
+}
+
+STATIC COMMAND
+LanguagesInput (
+  IN OUT APP *A,
+  IN INPUT    Input
+)
+{
+  // Rows: each language, then "Back".
+  UINTN Count = LANG_COUNT + 1;
+  UINTN Focus = A->LangList.Focus;
+
+  switch (Input) {
+  // AppInput acts on these itself.
+  case INPUT_START:
+  case INPUT_MODELS:
+    return None ();
+  case INPUT_UP:
+    A->LangList.Focus = (Focus + Count - 1) % Count;
+    break;
+  case INPUT_DOWN:
+    A->LangList.Focus = (Focus + 1) % Count;
+    break;
+  case INPUT_BACK:
+    LeaveLanguages (A);
+    break;
+  case INPUT_SELECT:
+    LeaveLanguages (A);
+    if (Focus < LANG_COUNT && LangSorted (Focus) != A->Settings.Language) {
+      A->Settings.Language = LangSorted (Focus);
+      LangSet (A->Settings.Language);
+      return Command (COMMAND_SAVE_SETTINGS, 0);
+    }
+    break;
+  }
+  return None ();
+}
+
 // Up and down switch between Cancel and the action; Back cancels. Yes on
 // the first uninstall card shows the second, with Cancel picked again.
 STATIC COMMAND
@@ -1149,6 +1193,8 @@ AppInput (
     return ModelsInput (A, Input);
   case SCREEN_ENTRIES:
     return EntriesInput (A, Input);
+  case SCREEN_LANGUAGES:
+    return LanguagesInput (A, Input);
   case SCREEN_CONFIRM:
     return ConfirmInput (A, Input);
   case SCREEN_ERROR:

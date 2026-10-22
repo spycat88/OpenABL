@@ -189,6 +189,7 @@ typedef enum {
   SCREEN_SCANNING,
   SCREEN_MODELS,
   SCREEN_ENTRIES,
+  SCREEN_LANGUAGES,
   SCREEN_CONFIRM,
   SCREEN_BOOTING,
   SCREEN_ERROR,
@@ -283,6 +284,9 @@ typedef struct _APP {
   ENTRY_VIEW Entries[MAX_ENTRIES];
   UINTN      EntryCount;
   LIST_STATE EntryList;
+
+  // The Language screen: the languages in LangSorted's order, then Back.
+  LIST_STATE LangList;
 
   // The device info or the log. LinesFrom is the menu item it was opened
   // from, focused again on the way back.

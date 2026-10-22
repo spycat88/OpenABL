@@ -185,6 +185,16 @@ LangSet (IN UINT8 Lang);
 CONST CHAR8 *
 LangName (IN UINT8 Lang);
 
+// Returns the language at Position (below LANG_COUNT) in the Language
+// screen's order: by name, in code point order, so Latin-script names
+// come first in alphabetical order.
+UINT8
+LangSorted (IN UINTN Position);
+
+// Returns Lang's position in that order.
+UINTN
+LangPosition (IN UINT8 Lang);
+
 // Writes Template to Out with Args filled in. {} takes the next argument
 // and {0} or {1} a given one, so word order can differ between languages.
 // Placeholders past ArgCount are left empty.

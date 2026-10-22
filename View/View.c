@@ -1512,6 +1512,49 @@ EntriesDraw (IN OUT APP *A)
   }
 }
 
+// The languages by name, each in itself, the current one ticked. No side
+// card: the names need no explaining, and the list takes the full width.
+STATIC VOID
+LanguagesDraw (IN OUT APP *A)
+{
+  RECT Title;
+  RECT Rest;
+  LIST List;
+  // Rows: each language, "Back".
+  UINTN Count = LANG_COUNT + 1;
+  UINTN Focus = A->LangList.Focus < Count ? A->LangList.Focus : Count - 1;
+
+  TakeTop (mView.Body, ToPxInt (28), &Title, &Rest);
+  TextIn (
+    Rect (Title.X, Title.Y, Title.W, ToPxInt (26)), gStrings->Language, 18,
+    FONT_WEIGHT_MEDIUM, THEME_TEXT, ALIGN_LEFT
+  );
+  INT32 Gap = ToPxInt (6);
+  ListInit (
+    &List, Rect (Rest.X, Rest.Y + Gap, Rest.W, Rest.H - Gap), ToPxInt (14),
+    Count, EvenRows (Count), NULL
+  );
+  ListPlace (&List, Focus, &A->LangList.Scroll);
+  for (UINTN Index = List.First; Index < List.End; Index++) {
+    RECT Row = ListRow (&List, Index);
+    if (Index < LANG_COUNT) {
+      UINT8   Lang    = LangSorted (Index);
+      BOOLEAN Current = Lang == A->Settings.Language;
+      RowItem (
+        Row, Current ? ICON_CIRCLE_CHECK : ICON_CIRCLE, LangName (Lang),
+        Current ? gStrings->Current : NULL, TONE_NORMAL, TRAILING_NONE,
+        Index == Focus
+      );
+    } else {
+      RowItem (
+        Row, ICON_ARROW_LEFT, gStrings->Back, NULL, TONE_NORMAL, TRAILING_NONE,
+        Index == Focus
+      );
+    }
+  }
+  ListChevrons (&List);
+}
+
 // Device info and the log
 
 // Row heights, worked out again only when the lines or the layout change.
@@ -1952,7 +1995,8 @@ STATIC BOOLEAN
 HasFooter (IN CONST APP *A)
 {
   return A->Screen == SCREEN_MENU || A->Screen == SCREEN_MODELS ||
-         A->Screen == SCREEN_ENTRIES || A->Screen == SCREEN_CONFIRM ||
+         A->Screen == SCREEN_ENTRIES || A->Screen == SCREEN_LANGUAGES ||
+         A->Screen == SCREEN_CONFIRM ||
          A->Screen == SCREEN_LINES;
 }
 
@@ -2082,6 +2126,9 @@ Build (IN OUT APP *A)
       break;
     case SCREEN_ENTRIES:
       EntriesDraw (A);
+      break;
+    case SCREEN_LANGUAGES:
+      LanguagesDraw (A);
       break;
     case SCREEN_LINES:
       LinesDraw (A);

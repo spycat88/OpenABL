@@ -59,6 +59,51 @@ LangName (IN UINT8 Lang)
   return mLangs[Lang < LANG_COUNT ? Lang : LANG_EN]->Name;
 }
 
+// Whether language A comes before language B: by name, compared byte by
+// byte (UTF-8 keeps code point order), then by ID.
+STATIC BOOLEAN
+NameBefore (
+  IN UINT8 A,
+  IN UINT8 B
+)
+{
+  CONST UINT8 *NameA = (CONST UINT8 *)mLangs[A]->Name;
+  CONST UINT8 *NameB = (CONST UINT8 *)mLangs[B]->Name;
+
+  while (*NameA && *NameA == *NameB) {
+    NameA++;
+    NameB++;
+  }
+  return *NameA != *NameB ? *NameA < *NameB : A < B;
+}
+
+UINTN
+LangPosition (IN UINT8 Lang)
+{
+  UINTN Position = 0;
+
+  if (Lang >= LANG_COUNT) {
+    Lang = LANG_EN;
+  }
+  for (UINT8 Other = 0; Other < LANG_COUNT; Other++) {
+    if (NameBefore (Other, Lang)) {
+      Position++;
+    }
+  }
+  return Position;
+}
+
+UINT8
+LangSorted (IN UINTN Position)
+{
+  for (UINT8 Lang = 0; Lang < LANG_COUNT; Lang++) {
+    if (LangPosition (Lang) == Position) {
+      return Lang;
+    }
+  }
+  return LANG_EN;
+}
+
 VOID
 LangFill (
   OUT CHAR8             *Out,

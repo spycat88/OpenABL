@@ -143,10 +143,6 @@ SettingsEffectiveRotation (IN CONST SETTINGS *Settings);
 VOID
 SettingsNextTimeout (IN OUT SETTINGS *Settings);
 
-// Moves to the next language.
-VOID
-SettingsNextLanguage (IN OUT SETTINGS *Settings);
-
 // Returns the menu label for what volume up does at boot.
 CONST CHAR8 *
 SettingsAltVolumeLabel (IN CONST SETTINGS *Settings);
