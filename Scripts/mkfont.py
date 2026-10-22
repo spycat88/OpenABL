@@ -2,9 +2,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026-present Open Handheld Collective
 #   https://github.com/OpenHandheldCollective
-"""Makes the CJK fallback face: mkfont.py FONT PRIMARY STRINGS > OUT.oablf
+"""Makes the CJK fallback face: mkfont.py FONT PRIMARY STRINGS... > OUT.oablf
 
-Converts the characters that the string literals in STRINGS (Ui/Lang.c) use
+Converts the characters that the string literals in the STRINGS files (the
+language files, Ui/Lang/*.c) use
 from the OpenType font FONT to the .oablf format (Gfx/Font.c), at 250 units
 per em, one weight. Characters that the primary face PRIMARY (an .oablf) or
 ASCII already cover are left out. Fails if FONT lacks a character, so no
@@ -116,15 +117,16 @@ class OutlinePen(BasePen):
 
 
 def main():
-    if len(sys.argv) != 4:
-        sys.exit('usage: mkfont.py FONT PRIMARY STRINGS > OUT.oablf')
-    font_path, primary_path, strings_path = sys.argv[1:]
+    if len(sys.argv) < 4:
+        sys.exit('usage: mkfont.py FONT PRIMARY STRINGS... > OUT.oablf')
+    font_path, primary_path, *strings_paths = sys.argv[1:]
     covered = primary_chars(primary_path)
     wanted = {}
-    for text in literals(open(strings_path, encoding='utf-8').read()):
-        for char in text:
-            if ord(char) > 0x7f and ord(char) not in covered:
-                wanted.setdefault(ord(char), text)
+    for strings_path in strings_paths:
+        for text in literals(open(strings_path, encoding='utf-8').read()):
+            for char in text:
+                if ord(char) > 0x7f and ord(char) not in covered:
+                    wanted.setdefault(ord(char), text)
 
     font = TTFont(font_path, lazy=True)
     cmap = font.getBestCmap()

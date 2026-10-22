@@ -196,6 +196,23 @@ SampleCaps (VOID)
 // The language of every app, from --lang.
 STATIC UINT8 mLanguage = LANG_EN;
 
+// --lang's tags, indexed by LANG_ID.
+STATIC CONST CHAR8 *CONST mLangTags[LANG_COUNT] = {
+  [LANG_EN]      = "en",
+  [LANG_ZH_HANS] = "zh-hans",
+};
+
+// Returns the LANG_ID tagged Tag, or LANG_COUNT if none is.
+STATIC UINT8
+LangByTag (IN CONST CHAR8 *Tag)
+{
+  UINT8 Lang;
+
+  for (Lang = 0; Lang < LANG_COUNT && strcmp (mLangTags[Lang], Tag); Lang++) {
+  }
+  return Lang;
+}
+
 STATIC VOID
 MakeApp (
   OUT APP           *A,
@@ -998,9 +1015,8 @@ main (
     } else if (!strcmp (Argv[Index], "--filter") && Index + 1 < Argc) {
       Filter = Argv[++Index];
     } else if (!strcmp (Argv[Index], "--lang") && Index + 1 < Argc &&
-               (!strcmp (Argv[Index + 1], "en") ||
-                !strcmp (Argv[Index + 1], "zh-hans"))) {
-      mLanguage = strcmp (Argv[++Index], "en") ? LANG_ZH_HANS : LANG_EN;
+               LangByTag (Argv[Index + 1]) < LANG_COUNT) {
+      mLanguage = LangByTag (Argv[++Index]);
     } else if (!strcmp (Argv[Index], "--check")) {
       DoCheck = TRUE;
     } else {

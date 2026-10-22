@@ -120,6 +120,10 @@ order:
 **Android** boots from the device's own boot partitions, the same way as
 with Qualcomm's ABL, including verified boot and recovery.
 
+The menu is in English and Simplified Chinese (简体中文), chosen with the
+Language setting. Each language is one file in `Ui/Lang/`;
+[Ui/Lang/README.md](Ui/Lang/README.md) explains adding one.
+
 ## Building
 
 Requires git and Docker. The build runs in an amd64 container, so on Apple
@@ -137,7 +141,6 @@ it.
 
 | Option | |
 |---|---|
-| `--lang zh-hans` | Simplified Chinese menu |
 | `--no-standard-boot` | Leave out standard boot (Linux then boots only from boot images) |
 | `--debug` | Debug build, with a Debug section in the menu |
 | `--clean` | Build each chipset from scratch |

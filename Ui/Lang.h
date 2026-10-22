@@ -6,9 +6,11 @@
 /**
   Lang - the menu's strings, in every language the menu offers.
 
-  The Language setting picks one at run time. The CJK face (made from these
-  strings at build time) is a fallback for the characters the menu font
-  lacks. {}, {0} and {1} mark where LangFill puts values.
+  Each language is one file in Ui/Lang/ that fills in a LANG_STRINGS; see
+  Ui/Lang/README.md for adding one. The Language setting picks one at run
+  time. The CJK face (made from those files at build time) is a fallback
+  for the characters the menu font lacks. {}, {0} and {1} mark where
+  LangFill puts values.
 */
 
 #ifndef __UI_LANG_H__
@@ -19,7 +21,10 @@
 // The stored values of the Language setting. Add new ones at the end.
 typedef enum { LANG_EN, LANG_ZH_HANS, LANG_COUNT } LANG_ID;
 
+// Only string pointers: Lang.c treats it as an array of them.
 typedef struct _LANG_STRINGS {
+  // The language's name, in itself, for the Language setting.
+  CONST CHAR8 *Name;
   CONST CHAR8 *Language;
   CONST CHAR8 *SectionBoot;
   CONST CHAR8 *SectionSettings;
@@ -171,7 +176,8 @@ typedef struct _LANG_STRINGS {
 // Strings in the current language, English until LangSet.
 extern CONST LANG_STRINGS *gStrings;
 
-// Switches the strings to Lang. An unknown Lang is English.
+// Switches the strings to Lang, with English for any it lacks. An unknown
+// Lang is English.
 VOID
 LangSet (IN UINT8 Lang);
 
