@@ -111,11 +111,14 @@ QcomDisplayPanelConfig (VOID);
 // variable that isn't flushed is lost at the next reset; SM8250 flushes on
 // ResetSystem but not on a hard reset. SDM845's XBL has no such protocol,
 // so with OABL_DEVINFO_SETTINGS the variables are packed into devinfo
-// instead. Otherwise FALSE without the protocol.
+// instead. The same goes where the flush is known to end the variable
+// services (VariablesFlushEnds); a flush that does so answers
+// EFI_DEVICE_ERROR. Otherwise FALSE without a usable flush.
 BOOLEAN
 QcomFlushVariables (OUT EFI_STATUS *Status);
 
-// TRUE if XBL can commit NV variables (EFI_VARIABLESERVICES_PROTOCOL).
+// TRUE if XBL can commit NV variables: it has
+// EFI_VARIABLESERVICES_PROTOCOL, and its flush isn't known to end them.
 BOOLEAN
 QcomHasVariableServices (VOID);
 

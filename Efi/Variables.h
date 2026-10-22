@@ -10,7 +10,8 @@
   TrustZone variable app, which writes them to the varstore partition only
   when flushed (QcomFlushVariables). SDM845's XBL has no variable services,
   so nothing flushes them; with OABL_DEVINFO_SETTINGS they are also packed
-  into devinfo at each flush and restored from it at start.
+  into devinfo at each flush and restored from it at start. The same goes
+  for an XBL whose flush ends its variable services (VariablesFlushEnds).
 */
 
 #ifndef __EFI_VARIABLES_H__
@@ -46,6 +47,23 @@ VariablesPut (
   IN UINTN        Length
 );
 
+// Whether XBL's variable services answer: a read of a variable nobody sets
+// answers EFI_NOT_FOUND while they work. Once they are gone every call
+// answers EFI_DEVICE_ERROR.
+BOOLEAN
+VariablesAnswer (VOID);
+
+// Whether this XBL's FlushVariableNV is known to end its variable services:
+// a flush did this boot, or devinfo's marker says one did on an earlier
+// boot. Devinfo is read once.
+BOOLEAN
+VariablesFlushEnds (VOID);
+
+// Records that FlushVariableNV ended the variable services, for this boot
+// and in devinfo for the later ones.
+VOID
+VariablesNoteFlushEnds (VOID);
+
 // Moves the OffmodeCharging setting into devinfo's charger screen flag,
 // which the ABL reads as stock Qualcomm code does. Run once, before the ABL
 // reads devinfo. The variable is then deleted and flushed.
@@ -76,14 +94,16 @@ VariablesReset (IN LOG_SINK Log);
 #ifdef OABL_DEVINFO_SETTINGS
 
 // Packs the variables into devinfo, in place of a flush where XBL has no
-// variable services. EFI_UNSUPPORTED without VerifiedBoot or a record,
-// EFI_OUT_OF_RESOURCES when devinfo had no room, EFI_WARN_WRITE_FAILURE
-// when a variable didn't fit.
+// variable services or its flush ends them. EFI_DEVICE_ERROR, with devinfo
+// left as it was, if the variables don't answer; EFI_UNSUPPORTED without
+// VerifiedBoot or a record, EFI_OUT_OF_RESOURCES when devinfo had no room,
+// EFI_WARN_WRITE_FAILURE when a variable didn't fit.
 EFI_STATUS
 VariablesPersistToDevinfo (VOID);
 
 // Restores the variables from devinfo's copy at start, where XBL has no
-// variable services and the last restart lost them.
+// variable services (or its flush ends them) and the last restart may have
+// lost them.
 VOID
 VariablesRestoreFromDevinfo (IN LOG_SINK Log);
 

@@ -44,7 +44,7 @@ chipset() {
     sm8550) ;;
     sm8650) OWN=park-display ;;
     sm8750) OWN=park-display OWN_FULL=sysfont ;;
-    sm8250) SIGN=-v6 PVMFW=false ;;
+    sm8250) SIGN=-v6 PVMFW=false OWN=devinfo-settings ;;
     *) echo "unknown chipset $1" >&2; usage ;;
   esac
 }

@@ -96,14 +96,14 @@ VarSet (
 VOID
 MenuFlush (VOID)
 {
+  // Asked first, as a flush that ends the variable services changes it.
+  BOOLEAN    Flushes = QcomHasVariableServices ();
   EFI_STATUS Status;
 
   if (QcomFlushVariables (&Status) &&
       (EFI_ERROR (Status) || Status == EFI_WARN_WRITE_FAILURE)) {
     MenuLog (
-      "%s%s",
-      QcomHasVariableServices () ? "FlushVariableNV: "
-                                 : "the settings into devinfo: ",
+      "%s%s", Flushes ? "FlushVariableNV: " : "the settings into devinfo: ",
       MENU_STATUS (Status)
     );
   }

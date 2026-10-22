@@ -19,6 +19,14 @@
 
 STATIC EFI_GUID mVendor = SETTINGS_VENDOR_GUID;
 
+// Devinfo's value marking that XBL's FlushVariableNV ends its variable
+// services. It describes the XBL, so a reset of the settings keeps it.
+#define FLUSH_ENDS_ENTRY "OablFlushEnds"
+
+// Whether FlushVariableNV ends the variable services, once known.
+STATIC BOOLEAN mFlushEndsKnown;
+STATIC BOOLEAN mFlushEnds;
+
 #define STATUS_TEXT(Status) StatusText ((Status), (CHAR8[STATUS_TEXT_SIZE]){0})
 
 // Converts Name to NUL-terminated UCS-2; FreePool the result.
@@ -113,6 +121,20 @@ VariablesPut (
   return Status;
 }
 
+BOOLEAN
+VariablesAnswer (VOID)
+{
+  STATIC CHAR16 Name[] = L"OablAnswer";
+  UINT8         Probe;
+  UINTN         Size       = 0;
+  UINT32        Attributes = 0;
+  EFI_STATUS    Status;
+
+  Status = gRT->GetVariable (Name, &mVendor, &Attributes, &Size, &Probe);
+  return Status == EFI_NOT_FOUND || Status == EFI_BUFFER_TOO_SMALL ||
+         Status == EFI_SUCCESS;
+}
+
 // Whether the setting is the single byte Value.
 STATIC BOOLEAN
 HoldsByte (
@@ -145,6 +167,42 @@ ReadDevinfo (OUT OABL_BUFFER *Raw)
   }
   BufferFree (Raw);
   return FALSE;
+}
+
+BOOLEAN
+VariablesFlushEnds (VOID)
+{
+  OABL_BUFFER Raw;
+  DEVINFO     Parsed;
+  OABL_BYTES  Value;
+
+  if (!mFlushEndsKnown) {
+    mFlushEndsKnown = TRUE;
+    if (ReadDevinfo (&Raw)) {
+      mFlushEnds = DevInfoParse (Raw.Data, Raw.Len, &Parsed) &&
+                   DevInfoValue (&Parsed, FLUSH_ENDS_ENTRY, &Value);
+      BufferFree (&Raw);
+    }
+  }
+  return mFlushEnds;
+}
+
+VOID
+VariablesNoteFlushEnds (VOID)
+{
+  STATIC CONST UINT8 One = 1;
+  OABL_BUFFER        Raw;
+  EFI_STATUS         Status;
+
+  mFlushEndsKnown = TRUE;
+  mFlushEnds      = TRUE;
+  if (!ReadDevinfo (&Raw)) {
+    return;
+  }
+  if (DevInfoSetValue (Raw.Data, Raw.Len, FLUSH_ENDS_ENTRY, &One, 1)) {
+    QcomWriteDeviceState (Raw.Data, Raw.Len, &Status);
+  }
+  BufferFree (&Raw);
 }
 
 VOID
@@ -187,8 +245,12 @@ VariablesChargerScreenToDevinfo (IN LOG_SINK Log)
       goto Done;
     }
   }
-  if (VariablesPut (SETTINGS_KEY_OFFMODE_CHARGING, NULL, 0) == EFI_SUCCESS) {
-    QcomFlushVariables (&Status);
+  if (VariablesPut (SETTINGS_KEY_OFFMODE_CHARGING, NULL, 0) == EFI_SUCCESS &&
+      QcomFlushVariables (&Status) && EFI_ERROR (Status)) {
+    LogPrint (
+      Log, "settings: flushing the charger screen's move: %s",
+      STATUS_TEXT (Status)
+    );
   }
   LogPrint (
     Log, "settings: the charger screen is devinfo's: %s", On ? "on" : "off"
@@ -437,6 +499,10 @@ VariablesPersistToDevinfo (VOID)
   BOOLEAN              Fits = TRUE;
   EFI_STATUS           Status;
 
+  // Packing variables that don't answer would empty devinfo's copy.
+  if (!VariablesAnswer ()) {
+    return EFI_DEVICE_ERROR;
+  }
   if (!ReadDevinfo (&Raw)) {
     return EFI_UNSUPPORTED;
   }

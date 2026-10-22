@@ -291,8 +291,9 @@ BOOLEAN
 QcomFlushVariables (OUT EFI_STATUS *Status)
 {
   VARIABLE_SERVICES *Services = Open (&mVariableServicesGuid);
+  BOOLEAN            Answered;
 
-  if (!Services) {
+  if (!Services || VariablesFlushEnds ()) {
 #ifdef OABL_DEVINFO_SETTINGS
     *Status = VariablesPersistToDevinfo ();
     return TRUE;
@@ -300,14 +301,23 @@ QcomFlushVariables (OUT EFI_STATUS *Status)
     return FALSE;
 #endif
   }
-  *Status = Services->FlushVariableNv (Services);
+  Answered = VariablesAnswer ();
+  *Status  = Services->FlushVariableNv (Services);
+  // Some XBLs' flush ends the variable services instead (as on an SM8250
+  // device): every call after it answers EFI_DEVICE_ERROR, and what was set
+  // this boot may never reach the varstore. Devinfo remembers it, so later
+  // boots don't flush.
+  if (Answered && !VariablesAnswer ()) {
+    VariablesNoteFlushEnds ();
+    *Status = EFI_DEVICE_ERROR;
+  }
   return TRUE;
 }
 
 BOOLEAN
 QcomHasVariableServices (VOID)
 {
-  return Open (&mVariableServicesGuid) != NULL;
+  return Open (&mVariableServicesGuid) != NULL && !VariablesFlushEnds ();
 }
 
 BOOLEAN

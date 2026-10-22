@@ -15,7 +15,8 @@
 #   sdcc-sm4450       SD card fix for SM4450's XBL (also sdcc-sm6450,
 #                     sdcc-sm7675)
 #   devinfo-settings  keep the settings in devinfo, for XBL builds that
-#                     can't save UEFI variables (SDM845)
+#                     can't save UEFI variables (SDM845) or whose flush
+#                     ends them (seen on SM8250)
 #   loader-quirks     XBL workarounds needed by OS loaders (SDM845, SM6115)
 #   park-display      turn the display off through XBL before Linux starts
 #                     (SM8650, SM8750)
