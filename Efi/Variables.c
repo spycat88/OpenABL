@@ -319,6 +319,120 @@ Done:
   BufferFree (&Raw);
 }
 
+// The most variables VariablesReset deletes.
+#define RESET_MAX 64
+
+// Lists the names of the variables under the settings' vendor GUID into
+// Names (RESET_MAX long; FreePool each). FALSE if the listing failed.
+STATIC BOOLEAN
+ListOwn (
+  OUT CHAR16 **Names,
+  OUT UINTN   *Count
+)
+{
+  UINTN      Cap  = 64 * sizeof (CHAR16);
+  CHAR16    *Name = AllocateZeroPool (Cap);
+  EFI_GUID   Guid;
+  EFI_STATUS Status;
+
+  *Count = 0;
+  if (!Name) {
+    return FALSE;
+  }
+  for (;;) {
+    UINTN Size = Cap;
+
+    Status = gRT->GetNextVariableName (&Size, Name, &Guid);
+    if (Status == EFI_BUFFER_TOO_SMALL) {
+      CHAR16 *Bigger = ResizePool (Name, Size);
+
+      if (!Bigger) {
+        break;
+      }
+      Name = Bigger;
+      Cap  = Size;
+      continue;
+    }
+    if (EFI_ERROR (Status) || !CompareGuid (&Guid, &mVendor)) {
+      if (EFI_ERROR (Status)) {
+        break;
+      }
+      continue;
+    }
+    if (*Count == RESET_MAX) {
+      Status = EFI_BUFFER_TOO_SMALL;
+      break;
+    }
+    Names[*Count] = AllocateCopyPool (Size, Name);
+    if (!Names[*Count]) {
+      Status = EFI_OUT_OF_RESOURCES;
+      break;
+    }
+    (*Count)++;
+  }
+  FreePool (Name);
+  return Status == EFI_NOT_FOUND;
+}
+
+EFI_STATUS
+VariablesReset (IN LOG_SINK Log)
+{
+  CHAR16      *Names[RESET_MAX];
+  CONST CHAR8 *Values[SETTINGS_STORE_ENTRIES + DEVINFO_LEGACY_SETTINGS_LEN +
+                      DEVINFO_LEGACY_ONLY_LEN];
+  UINTN        Count;
+  UINTN        ValueCount = 0;
+  UINTN        Deleted    = 0;
+  UINT8        None       = 0;
+  BOOLEAN      Ok;
+  OABL_BUFFER  Raw;
+  EFI_STATUS   Status;
+
+  // Listed first, as deleting while walking the names can lose the place.
+  Ok = ListOwn (Names, &Count);
+  if (!Ok) {
+    LogPrint (Log, "settings reset: listing the variables failed");
+  }
+  for (UINTN Index = 0; Index < Count; Index++) {
+    Status = gRT->SetVariable (Names[Index], &mVendor, 0, 0, &None);
+    if (Status == EFI_SUCCESS || Status == EFI_NOT_FOUND) {
+      Deleted++;
+    } else {
+      Ok = FALSE;
+    }
+    FreePool (Names[Index]);
+  }
+  QcomFlushVariables (&Status);
+  LogPrint (
+    Log, "settings reset: %llu of %llu variable(s) deleted", (UINT64)Deleted,
+    (UINT64)Count
+  );
+  // Then devinfo, after the flush, which writes the settings' copy there
+  // where XBL has no variable services.
+  Values[ValueCount++] = SETTINGS_STORE_ENTRY;
+  for (UINTN Index = 0; Index < SETTINGS_STORE_MODEL_ENTRIES; Index++) {
+    Values[ValueCount++] = gSettingsStoreModelEntries[Index];
+  }
+  for (UINTN Index = 0; Index < DEVINFO_LEGACY_SETTINGS_LEN; Index++) {
+    Values[ValueCount++] = gDevInfoLegacySettings[Index].Name;
+  }
+  for (UINTN Index = 0; Index < DEVINFO_LEGACY_ONLY_LEN; Index++) {
+    Values[ValueCount++] = gDevInfoLegacyOnly[Index];
+  }
+  if (ReadDevinfo (&Raw)) {
+    if (DevInfoClearValues (Raw.Data, Raw.Len, Values, ValueCount) &&
+        QcomWriteDeviceState (Raw.Data, Raw.Len, &Status) &&
+        EFI_ERROR (Status)) {
+      LogPrint (
+        Log, "settings reset: clearing devinfo: %s", STATUS_TEXT (Status)
+      );
+      Ok = FALSE;
+    }
+    BufferFree (&Raw);
+  }
+  return Ok ? EFI_SUCCESS : EFI_DEVICE_ERROR;
+}
+
 #ifdef OABL_DEVINFO_SETTINGS
 
 // VariablesGet as Core/Settings' SETTINGS_GET.

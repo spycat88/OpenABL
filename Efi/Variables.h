@@ -61,6 +61,13 @@ VariablesChargerScreenToDevinfo (IN LOG_SINK Log);
 VOID
 VariablesMoveOutOfDevinfo (IN LOG_SINK Log);
 
+// Deletes every variable under the settings' vendor GUID, flushes, and
+// clears OpenABL's values from devinfo (the settings' copy and the old
+// ones), so the next boot starts as the first did. EFI_DEVICE_ERROR when a
+// variable couldn't be deleted or listed; the rest are deleted anyway.
+EFI_STATUS
+VariablesReset (IN LOG_SINK Log);
+
 #ifdef OABL_DEVINFO_SETTINGS
 
 // Packs the variables into devinfo, in place of a flush where XBL has no

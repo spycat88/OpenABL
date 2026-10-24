@@ -1455,6 +1455,16 @@ RunCommand (
     }
     break;
   }
+  case COMMAND_RESET_SETTINGS:
+    // As on the first boot: the restart moves in the defaults again.
+    if (VariablesReset (gMenuEfiLog) != EFI_SUCCESS) {
+      AppOnFailed (&mApp, gStrings->DeveloperOptionsResetFailed);
+      break;
+    }
+    if (Act (M, OPENABL_MENU_ACTION_RESTART_BOOTLOADER) != EFI_SUCCESS) {
+      AppOnFailed (&mApp, gStrings->AblActionFailed);
+    }
+    break;
   case COMMAND_LOG: {
     OABL_BUFFER Raw   = {0};
     CHAR8     **Lines = AllocateZeroArray (LOG_LINES, sizeof (*Lines));
