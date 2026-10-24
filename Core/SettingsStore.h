@@ -15,7 +15,7 @@
     a little-endian bitfield with every small setting, bytes 10-13 the
     FNV-1a hash of the model DeviceModelRotation was looked up for, and
     bytes 14-31 are reserved (zero). Each setting in the bitfield is 0 when
-    unset, else 1 + its value. Bits 43-63 are free. Later formats only add
+    unset, else 1 + its value. Bits 44-63 are free. Later formats only add
     fields, so older code can still read a newer copy.
   - OablModel0 to OablModel2: the device model name, 32 bytes each.
 */

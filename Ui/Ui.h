@@ -53,6 +53,7 @@ typedef struct _DEVELOPER_OPTIONS {
   BOOLEAN PanelLinesOff;
   BOOLEAN BootLog;       // SETTINGS_BOOT_LOG
   BOOLEAN SdDiagnostics; // SETTINGS_SD_DIAGNOSTICS
+  BOOLEAN Unlocked;      // SETTINGS_DEVELOPER_OPTIONS_UNLOCKED
 } DEVELOPER_OPTIONS;
 
 typedef enum {
@@ -287,7 +288,9 @@ typedef struct _APP {
 
   DEVELOPER_OPTIONS DeveloperOptions;
   LIST_STATE        DeveloperOptionsList;
-  INT32             Booting; // the entry picked from the list, or -1
+  // Presses on the bootloader version since Device info opened.
+  UINT8 UnlockPresses;
+  INT32 Booting; // the entry picked from the list, or -1
 
   CHAR8   Toast[160];
   UINT64  ToastUntil; // 0 for no toast
