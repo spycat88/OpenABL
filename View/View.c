@@ -9,8 +9,10 @@
   Each frame describes the whole screen as microui commands, and Frame.c
   draws only what changed. A frame is made when the app changes and while
   something moves: the countdown bar, the boot screen's sweep, and the
-  dialog and toast fading in. Lists jump to their new place instead of
-  scrolling.
+  dialog and toast fading in, the focus card sliding to the focused row, and
+  a new screen sliding in from the side it was opened from. Lists jump to
+  their new place instead of scrolling. Each animation is short, and Frame.c
+  redraws only what moves, so the focus card costs two rows a frame.
 */
 
 #include "View/View.h"
@@ -53,6 +55,10 @@ extern CONST UINTN gOablAssetFontCjkSize;
 #define OVERLAY_FADE_MS 120
 #define TOAST_FADE_MS   150
 #define SWEEP_MS        1100
+#define FOCUS_MS        110
+#define SLIDE_MS        170
+// How far a new screen slides, in layout units.
+#define SLIDE_UNITS 28
 
 // The windows: the screen, and the dialog and the toast over it.
 #define WINDOW_OPTIONS                                                         \
@@ -222,6 +228,19 @@ STATIC struct {
   UINT64  ToastUntil; // the toast shown
   BOOLEAN ToastFaded;
   UINT32  ToastTick;
+  // The screen the last frame showed (the menu for its dialog), and its
+  // slide in: SlideFrom pixels to the right (left when negative) at first.
+  SCREEN  Screen;
+  BOOLEAN ScreenShown, Slid;
+  INT32   SlideFrom;
+  UINT32  SlideTick;
+  // The focus card slides from FocusFrom to FocusTo, kept relative to the
+  // body so the screen's slide doesn't move it. FocusKey is the list it is
+  // on: on another list, or the same one moved, it starts in place.
+  BOOLEAN FocusShown, FocusMoved;
+  UINT32  FocusKey;
+  RECT    FocusFrom, FocusTo;
+  UINT32  FocusTick;
 } mView;
 
 STATIC float
@@ -318,6 +337,38 @@ EaseInOut (IN float T)
     S = (Low + High) / 2;
   }
   return 3 * (1 - S) * S * S + S * S * S;
+}
+
+// The ease-out curve, cubic, at T in 0..1: quick to start, so a key press
+// shows at once, and settling gently.
+STATIC float
+EaseOut (IN float T)
+{
+  float U = 1 - T;
+
+  return 1 - U * U * U;
+}
+
+// Returns how far an ease-out move of Duration ms from Tick has got, from 0
+// to 1, setting *Done at the end. *Done skips it.
+STATIC float
+Move (
+  IN UINT32       Tick,
+  IN UINT32       Duration,
+  IN OUT BOOLEAN *Done
+)
+{
+  INT32 Step;
+
+  if (*Done) {
+    return 1;
+  }
+  Step = Progress (Tick, Duration);
+  if (Step == 1024) {
+    *Done = TRUE;
+    return 1;
+  }
+  return EaseOut ((float)Step / 1024);
 }
 
 // Drawing, as microui commands
@@ -691,7 +742,85 @@ ListChevrons (IN CONST LIST *List)
   }
 }
 
-// Draws a list row.
+// Returns the point T of the way from From to To, at From's size.
+STATIC RECT
+Between (
+  IN RECT  From,
+  IN RECT  To,
+  IN float T
+)
+{
+  return Rect (
+    From.X + (INT32)RoundF ((float)(To.X - From.X) * T),
+    From.Y + (INT32)RoundF ((float)(To.Y - From.Y) * T), From.W, From.H
+  );
+}
+
+// Returns where the focus card for row Target of the list in Area goes now.
+// When the focus moves along the same list, the card slides from where it
+// was. Only its place moves: its size is the target's, so a slide makes no
+// new masks.
+STATIC RECT
+FocusPlace (
+  IN RECT Area,
+  IN RECT Target
+)
+{
+  INT32  X0  = mView.Body.X;
+  INT32  Y0  = mView.Body.Y;
+  RECT   To  = Rect (Target.X - X0, Target.Y - Y0, Target.W, Target.H);
+  RECT   Own = Rect (Area.X - X0, Area.Y - Y0, Area.W, Area.H);
+  UINT32 Key = Digest (2166136261u, &mView.Screen, sizeof (mView.Screen));
+  RECT   Place;
+
+  Key = Digest (Key, &Own, sizeof (Own));
+  if (!mView.FocusShown || Key != mView.FocusKey) {
+    mView.FocusShown = TRUE;
+    mView.FocusKey   = Key;
+    mView.FocusFrom  = To;
+    mView.FocusTo    = To;
+    mView.FocusMoved = TRUE;
+  } else if (To.X != mView.FocusTo.X || To.Y != mView.FocusTo.Y) {
+    // Start from where the card is now, so presses in a row chain smoothly.
+    mView.FocusFrom = Between (
+      mView.FocusFrom, mView.FocusTo,
+      Move (mView.FocusTick, FOCUS_MS, &mView.FocusMoved)
+    );
+    mView.FocusTo    = To;
+    mView.FocusTick  = mView.Now;
+    mView.FocusMoved = FALSE;
+  }
+  Place = Between (
+    mView.FocusFrom, To, Move (mView.FocusTick, FOCUS_MS, &mView.FocusMoved)
+  );
+  return Rect (X0 + Place.X, Y0 + Place.Y, To.W, To.H);
+}
+
+// Draws the focus card behind row Focus of List, before the rows so it
+// slides under their text. A danger row's card is red.
+STATIC VOID
+FocusCard (
+  IN CONST LIST *List,
+  IN UINTN       Focus,
+  IN TONE        Tone
+)
+{
+  RECT Card;
+
+  if (Focus < List->First || Focus >= List->End) {
+    return;
+  }
+  Card = FocusPlace (List->Area, ListRow (List, Focus));
+  if (Tone == TONE_DANGER) {
+    RoundRect (Card, 8, THEME_DANGER_BG);
+    Ring (Card, 8, 1.5f, THEME_DANGER_FILL);
+  } else {
+    RoundRect (Card, 8, THEME_ACCENT_BG);
+    Ring (Card, 8, 1.5f, THEME_ACCENT);
+  }
+}
+
+// Draws a list row. A selected row's card is FocusCard's.
 STATIC VOID
 RowItem (
   IN RECT         Row,
@@ -703,21 +832,17 @@ RowItem (
   IN BOOLEAN      Selected
 )
 {
-  UINT32 Background = 0;
-  UINT32 Edge       = THEME_LINE;
   UINT32 Foreground;
   UINT32 IconColor;
   UINT32 ValueColor;
 
   if (Tone == TONE_DANGER && Selected) {
-    Background = THEME_DANGER_BG, Edge = THEME_DANGER_FILL,
     Foreground = THEME_DANGER_TEXT, IconColor = THEME_DANGER,
     ValueColor = THEME_DANGER_TEXT;
   } else if (Tone == TONE_DANGER) {
     Foreground = THEME_DANGER, IconColor = THEME_DANGER,
     ValueColor = THEME_TEXT2;
   } else if (Selected) {
-    Background = THEME_ACCENT_BG, Edge = THEME_ACCENT,
     Foreground = THEME_ACCENT_TEXT, IconColor = THEME_ACCENT,
     ValueColor = THEME_ACCENT_TEXT;
   } else if (Tone == TONE_PRIMARY) {
@@ -725,11 +850,6 @@ RowItem (
   } else {
     Foreground = THEME_TEXT, IconColor = THEME_TEXT2, ValueColor = THEME_TEXT2;
   }
-  if (Selected) {
-    RoundRect (Row, 8, Background);
-    Ring (Row, 8, 1.5f, Edge);
-  }
-
   float X   = (float)Row.X;
   float W   = (float)Row.W;
   float Pad = ToPx (10);
@@ -1224,6 +1344,11 @@ MenuDraw (IN OUT APP *A)
   }
   ListInit (&List, Area, ToPxInt (14), Count, Heights, Headers);
   ListPlace (&List, Focus, &A->Menu.Scroll);
+  if (Focus < Count && !Rows[Focus].Header) {
+    ITEM_VIEW View;
+    AppItemView (A, Rows[Focus].Item, &View);
+    FocusCard (&List, Focus, View.Tone);
+  }
   for (UINTN Index = List.First; Index < List.End; Index++) {
     RECT Row = ListRow (&List, Index);
     if (Rows[Index].Header) {
@@ -1376,6 +1501,7 @@ ModelsDraw (IN OUT APP *A)
   );
   ListInit (&List, Area, ToPxInt (14), Count, EvenRows (Count), NULL);
   ListPlace (&List, Focus, &A->ModelList.Scroll);
+  FocusCard (&List, Focus, TONE_NORMAL);
   for (UINTN Index = List.First; Index < List.End; Index++) {
     RECT Row = ListRow (&List, Index);
     if (Index == 0) {
@@ -1482,6 +1608,10 @@ EntriesDraw (IN OUT APP *A)
   );
   ListInit (&List, Area, ToPxInt (14), Count, EvenRows (Count), NULL);
   ListPlace (&List, Focus, &A->EntryList.Scroll);
+  FocusCard (
+    &List, Focus,
+    Focus < A->EntryCount && A->Entries[Focus].Bad ? TONE_DANGER : TONE_NORMAL
+  );
   for (UINTN Index = List.First; Index < List.End; Index++) {
     RECT Row = ListRow (&List, Index);
     if (Index < A->EntryCount) {
@@ -1584,13 +1714,18 @@ LinesDraw (IN OUT APP *A)
     Focus = Count - 1;
   }
   ListPlace (&List, Focus, &A->InfoList.Scroll);
+  if (Count && Focus >= List.First && Focus < List.End) {
+    // Rows differ in height, so a card on its way can reach past the list.
+    mu_push_clip_rect (
+      mView.Ctx, mu_rect (List.Area.X, List.Area.Y, List.Area.W, List.Area.H)
+    );
+    RoundRect (FocusPlace (List.Area, ListRow (&List, Focus)), 8, THEME_CARD);
+    mu_pop_clip_rect (mView.Ctx);
+  }
   for (UINTN Index = List.First; Index < List.End; Index++) {
     CONST TEXT_LINE *Line   = &A->Lines[Index];
     RECT             Row    = ListRow (&List, Index);
     INT32            LabelH = Line->Label[0] ? ToPxInt (22) : ToPxInt (4);
-    if (Index == Focus) {
-      RoundRect (Row, 8, THEME_CARD);
-    }
     if (Line->Label[0]) {
       TextIn (
         Rect (Row.X + Pad, Row.Y + ToPxInt (4), Row.W - 2 * Pad, ToPxInt (16)),
@@ -2012,10 +2147,13 @@ Layout (IN CONST APP *A)
   FrameInvalidate ();
   mFitCount    = 0;
   mLines.Valid = FALSE;
-  // The dialog and the toast fade in again, and the bar starts over.
+  // The dialog and the toast fade in again, and the bar starts over. The
+  // screen and the focus card show where they are, without moving.
   mView.OverlayShown = FALSE;
   mView.ToastUntil   = (UINT64)-1;
   mView.BarShown     = FALSE;
+  mView.ScreenShown  = FALSE;
+  mView.FocusShown   = FALSE;
 }
 
 // Opens a window covering the picture, for the screen, the dialog or the
@@ -2027,6 +2165,50 @@ BeginWindow (IN CONST CHAR8 *Name)
 
   mu_get_container (mView.Ctx, Name)->rect = Full;
   return mu_begin_window_ex (mView.Ctx, Name, Full, WINDOW_OPTIONS) != 0;
+}
+
+// Returns how deep Screen is: the menu, the scan on the way to the models,
+// or a screen opened from the menu. Only these screens slide in, and only
+// when the depth changes. Other screens come and go with work that may
+// start before the next frame. The scan's own slide is settled before the
+// scan runs, but the models then slide in after it.
+STATIC INT32
+Depth (IN SCREEN Screen)
+{
+  switch (Screen) {
+  case SCREEN_MENU:
+    return 0;
+  case SCREEN_SCANNING:
+    return 1;
+  case SCREEN_MODELS:
+  case SCREEN_ENTRIES:
+  case SCREEN_LINES:
+    return 2;
+  default:
+    return -1;
+  }
+}
+
+// Starts a slide when the screen changes: a deeper screen comes in from the
+// right, and the way back from the left.
+STATIC VOID
+SlideStart (IN SCREEN Screen)
+{
+  INT32 From;
+  INT32 To;
+
+  if (mView.ScreenShown && Screen == mView.Screen) {
+    return;
+  }
+  From = mView.ScreenShown ? Depth (mView.Screen) : -1;
+  To   = Depth (Screen);
+  mView.Slid = From < 0 || To < 0 || From == To;
+  if (!mView.Slid) {
+    mView.SlideFrom = ToPxInt (To > From ? SLIDE_UNITS : -SLIDE_UNITS);
+    mView.SlideTick = mView.Now;
+  }
+  mView.Screen      = Screen;
+  mView.ScreenShown = TRUE;
 }
 
 // Makes the frame's command list from the app.
@@ -2061,12 +2243,22 @@ Build (IN OUT APP *A)
   if (Screen != SCREEN_BOOTING) {
     mView.Sweeping = FALSE;
   }
+  SlideStart (Screen);
 
   mView.Ctx = FrameBegin ();
   if (BeginWindow ("screen")) {
+    RECT  Clip  = mView.Body;
+    float Slide = Move (mView.SlideTick, SLIDE_MS, &mView.Slid);
+
     HeaderDraw (A);
     if (Footer) {
       FooterDraw (A);
+    }
+    // A sliding screen fades in as it comes, drawn only within the body.
+    if (Slide < 1) {
+      mView.Body.X += (INT32)RoundF ((float)mView.SlideFrom * (1 - Slide));
+      mView.Alpha   = (UINT8)(Slide * 255);
+      mu_push_clip_rect (mView.Ctx, mu_rect (Clip.X, Clip.Y, Clip.W, Clip.H));
     }
     switch (Screen) {
     case SCREEN_MENU:
@@ -2097,6 +2289,11 @@ Build (IN OUT APP *A)
     case SCREEN_ERROR:
       ErrorDraw (A);
       break;
+    }
+    if (Slide < 1) {
+      mu_pop_clip_rect (mView.Ctx);
+      mView.Body  = Clip;
+      mView.Alpha = 255;
     }
     mu_end_window (mView.Ctx);
   }
@@ -2207,9 +2404,12 @@ ViewSettle (VOID)
   if (!mView.Ready) {
     return;
   }
-  // Finish the fades so still pictures show where they end.
+  // Finish the fades and slides so still pictures show where they end, and
+  // a command runs with the screen as it will stay.
   mView.OverlayFaded = TRUE;
   mView.ToastFaded   = TRUE;
+  mView.Slid         = TRUE;
+  mView.FocusMoved   = TRUE;
   if (mView.App) {
     Build (mView.App);
   }
