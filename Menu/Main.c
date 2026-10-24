@@ -280,7 +280,7 @@ StandardBoot (
     MenuLog ("plan %llu: %s", (UINT64)Index, Description ? Description : "");
     FreePool (Description);
   }
-  if (MenuDebugOption (SETTINGS_DEBUG_BOOT_LOG)) {
+  if (MenuDeveloperOptionsHas (SETTINGS_BOOT_LOG)) {
     // The boot's steps on screen too, to see where one stops.
     SerialToScreen ();
   }
@@ -825,7 +825,7 @@ Early (IN CONST MENU_HOST *Host)
   BufferFree (&Mode);
   Chip    = QuirksChipId ();
   Patched = QuirksSdccUhs (
-    Chip, MenuDebugOption (SETTINGS_DEBUG_SD_DIAGNOSTICS), gMenuEfiLog
+    Chip, MenuDeveloperOptionsHas (SETTINGS_SD_DIAGNOSTICS), gMenuEfiLog
   );
   MenuLog ("early: %u SdccDxe site(s) patched", Patched);
   if (!Resident ()) {
