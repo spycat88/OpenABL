@@ -50,11 +50,12 @@ PanelXmlNameAt (
   OUT OABL_TEXT       *Name
 );
 
-// DisplayQuiesce bit 0: turn the display off through XBL's display power
-// protocol at ExitBootServices, even when the devicetree keeps the splash.
+// DisplayHandoverQuiesceSetting bit 0: turn the display off through XBL's
+// display power protocol at ExitBootServices, even when the devicetree keeps
+// the splash.
 #define DISPLAY_HANDOVER_QUIESCE 1
-// DisplayQuiesce bit 1: turn the panel lines off, the backlight before the
-// display and the supplies after it.
+// DisplayHandoverQuiesceSetting bit 1: turn the panel lines off, the
+// backlight before the display and the supplies after it.
 #define DISPLAY_HANDOVER_LINES_OFF 2
 
 // PMIC lines are turned off with SPMI writes, TLMM lines through XBL's TLMM

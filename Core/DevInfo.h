@@ -56,11 +56,11 @@ typedef struct _DEVINFO_LEGACY {
 
 // The persistent values that held the settings before they moved to
 // UEFI variables, in the order they are moved.
-#define DEVINFO_LEGACY_SETTINGS_LEN 7
+#define DEVINFO_LEGACY_SETTINGS_LEN 6
 extern CONST DEVINFO_LEGACY gDevInfoLegacySettings[DEVINFO_LEGACY_SETTINGS_LEN];
 
 // Old values with no setting now, cleared along with the others.
-#define DEVINFO_LEGACY_ONLY_LEN 2
+#define DEVINFO_LEGACY_ONLY_LEN 3
 extern CONST CHAR8 *CONST gDevInfoLegacyOnly[DEVINFO_LEGACY_ONLY_LEN];
 
 // Number of variables DevInfoSettingsMove writes.

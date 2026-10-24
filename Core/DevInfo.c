@@ -36,11 +36,10 @@ CONST DEVINFO_LEGACY gDevInfoLegacySettings[DEVINFO_LEGACY_SETTINGS_LEN] = {
   {SETTINGS_KEY_BOOT_SOURCE, "BootSourceMode"},
   {SETTINGS_KEY_MODEL, "ModelSelection"},
   {SETTINGS_KEY_SHOW_MODEL_MENU, "ShowModelMenu"},
-  {SETTINGS_KEY_DISPLAY_QUIESCE, "DisplayQuiesce"},
 };
 
 CONST CHAR8 *CONST gDevInfoLegacyOnly[DEVINFO_LEGACY_ONLY_LEN] = {
-  "OpenAblVer", "ForceExternalBoot"};
+  "OpenAblVer", "ForceExternalBoot", "DisplayQuiesce"};
 
 STATIC BOOLEAN
 IsRecord (
