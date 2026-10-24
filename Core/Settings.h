@@ -98,17 +98,18 @@ extern CONST UINT8 gSettingsTimeoutChoices[4];
 #define SETTINGS_KEY_DISPLAY_QUIESCE "DisplayQuiesce"
 #define SETTINGS_KEY_CUSTOM_LOGO     "CustomLogo"
 #define SETTINGS_KEY_LANGUAGE        "MenuLanguage"
-// Experimental, set from the menu's Debug section: 1 starts USB host in the
-// same boot as fastboot instead of restarting. On the glink SoCs XBL died
-// when a drive was attached after the gadget had run.
+// Experimental, set from the menu's developer options: 1 starts USB host in
+// the same boot as fastboot instead of restarting. On the glink SoCs XBL
+// died when a drive was attached after the gadget had run.
 #define SETTINGS_KEY_USB_HOST_LIVE "UsbHostLive"
-// SETTINGS_DEBUG_* bits, set from the menu's Debug section. Absent means 0.
-#define SETTINGS_KEY_DEBUG "DebugOptions"
+// SETTINGS_BOOT_LOG and SETTINGS_SD_DIAGNOSTICS bits, set from the menu's
+// developer options. Absent means 0.
+#define SETTINGS_KEY_DEVELOPER_OPTIONS "DeveloperOptions"
 // The boot's log lines also go to the screen, which isn't cleared before
 // the image starts, to see where a boot stops.
-#define SETTINGS_DEBUG_BOOT_LOG 1
+#define SETTINGS_BOOT_LOG 1
 // The SD slot's state is logged before and after the SdccDxe patches.
-#define SETTINGS_DEBUG_SD_DIAGNOSTICS 2
+#define SETTINGS_SD_DIAGNOSTICS 2
 
 VOID
 SettingsDefault (OUT SETTINGS *Settings);

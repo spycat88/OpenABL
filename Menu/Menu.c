@@ -78,11 +78,11 @@ MenuVarIs (
 }
 
 BOOLEAN
-MenuDebugOption (IN UINT8 Bit)
+MenuDeveloperOptionsHas (IN UINT8 Bit)
 {
   OABL_BUFFER Stored = {0};
   BOOLEAN     Set =
-    MenuVarGet (SETTINGS_KEY_DEBUG, &Stored) && Stored.Len == 1 &&
+    MenuVarGet (SETTINGS_KEY_DEVELOPER_OPTIONS, &Stored) && Stored.Len == 1 &&
     (Stored.Data[0] & Bit) != 0;
 
   BufferFree (&Stored);
@@ -1207,11 +1207,11 @@ LogLines (
   return Count;
 }
 
-// Debug section
+// Developer options
 
-// Reads the Debug section's switches. A missing variable means off.
-STATIC EXPERIMENTS
-Experiments (VOID)
+// Reads the developer options. A missing variable means off.
+STATIC DEVELOPER_OPTIONS
+ReadDeveloperOptions (VOID)
 {
   OABL_BUFFER Stored = {0};
   UINT8       Quiesce =
@@ -1220,24 +1220,24 @@ Experiments (VOID)
       : 0;
 
   BufferFree (&Stored);
-  return (EXPERIMENTS){
+  return (DEVELOPER_OPTIONS){
     .UsbLive       = MenuVarIs (SETTINGS_KEY_USB_HOST_LIVE, 1),
     .Quiesce       = Quiesce & 1,
     .PanelLinesOff = (Quiesce & 2) != 0,
-    .BootLog       = MenuDebugOption (SETTINGS_DEBUG_BOOT_LOG),
-    .SdDiagnostics = MenuDebugOption (SETTINGS_DEBUG_SD_DIAGNOSTICS),
+    .BootLog       = MenuDeveloperOptionsHas (SETTINGS_BOOT_LOG),
+    .SdDiagnostics = MenuDeveloperOptionsHas (SETTINGS_SD_DIAGNOSTICS),
   };
 }
 
-// Stores and flushes the Debug section's switches.
+// Stores and flushes the developer options.
 STATIC EFI_STATUS
-SaveExperiments (IN EXPERIMENTS Want)
+SaveDeveloperOptions (IN DEVELOPER_OPTIONS Want)
 {
   STATIC CONST UINT8 One     = 1;
   UINT8              Quiesce = (UINT8)(Want.Quiesce | Want.PanelLinesOff << 1);
-  UINT8              Debug =
-    (UINT8)((Want.BootLog ? SETTINGS_DEBUG_BOOT_LOG : 0) |
-            (Want.SdDiagnostics ? SETTINGS_DEBUG_SD_DIAGNOSTICS : 0));
+  UINT8              Bits =
+    (UINT8)((Want.BootLog ? SETTINGS_BOOT_LOG : 0) |
+            (Want.SdDiagnostics ? SETTINGS_SD_DIAGNOSTICS : 0));
   EFI_STATUS Status =
     MenuVarPut (SETTINGS_KEY_USB_HOST_LIVE, &One, Want.UsbLive ? 1 : 0);
 
@@ -1248,14 +1248,14 @@ SaveExperiments (IN EXPERIMENTS Want)
   if (EFI_ERROR (Status)) {
     return Status;
   }
-  Status = MenuVarPut (SETTINGS_KEY_DEBUG, &Debug, Debug ? 1 : 0);
+  Status = MenuVarPut (SETTINGS_KEY_DEVELOPER_OPTIONS, &Bits, Bits ? 1 : 0);
   if (EFI_ERROR (Status)) {
     return Status;
   }
   MenuFlush ();
   MenuLog (
-    "experiments: live USB host %s, display parked %s, panel lines off %s, "
-    "boot log on screen %s, SD diagnostics %s",
+    "developer options: live USB host %s, display parked %s, panel lines off "
+    "%s, boot log on screen %s, SD diagnostics %s",
     Want.UsbLive ? "on" : "off", Want.Quiesce ? "on" : "off",
     Want.PanelLinesOff ? "on" : "off", Want.BootLog ? "on" : "off",
     Want.SdDiagnostics ? "on" : "off"
@@ -1443,13 +1443,14 @@ RunCommand (
     M->RestartAt = ClockNowMs () + UNINSTALL_RESTART_MS;
     break;
   }
-  case COMMAND_SAVE_EXPERIMENTS: {
-    EXPERIMENTS Want = Command.Experiments;
-    EXPERIMENTS Now;
-    BOOLEAN     Ok = M->Writable && SaveExperiments (Want) == EFI_SUCCESS;
+  case COMMAND_SAVE_DEVELOPER_OPTIONS: {
+    DEVELOPER_OPTIONS Want = Command.DeveloperOptions;
+    DEVELOPER_OPTIONS Now;
+    BOOLEAN           Ok =
+      M->Writable && SaveDeveloperOptions (Want) == EFI_SUCCESS;
 
-    Now = Experiments ();
-    AppSetExperiments (&mApp, &Now);
+    Now = ReadDeveloperOptions ();
+    AppSetDeveloperOptions (&mApp, &Now);
     if (!Ok || Now.UsbLive != Want.UsbLive || Now.Quiesce != Want.Quiesce ||
         Now.PanelLinesOff != Want.PanelLinesOff ||
         Now.BootLog != Want.BootLog ||
@@ -1624,8 +1625,8 @@ MenuRun (
     }
   }
   {
-    EXPERIMENTS Switches = Experiments ();
-    AppSetExperiments (&mApp, &Switches);
+    DEVELOPER_OPTIONS Switches = ReadDeveloperOptions ();
+    AppSetDeveloperOptions (&mApp, &Switches);
   }
   AppStart (&mApp, ClockNowMs (), TRUE);
   {

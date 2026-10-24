@@ -1176,17 +1176,20 @@ Countdown (
   Fill (Bar, THEME_ACCENT, 255);
 }
 
-// The menu, with the countdown banner over the list and the info card
-// beside it (landscape) or above it (portrait).
+// The menu or the developer options, with the countdown banner over the
+// list and the info card beside it (landscape) or above it (portrait).
 STATIC VOID
 MenuDraw (IN OUT APP *A)
 {
-  ROW     Rows[MAX_ROWS];
-  INT32   Heights[MAX_ROWS];
-  BOOLEAN Headers[MAX_ROWS];
-  UINTN   Count = AppRows (A, Rows);
-  UINTN   Focus = AppFocusedRow (A, Rows, Count);
-  RECT    Body  = mView.Body;
+  ROW         Rows[MAX_ROWS];
+  INT32       Heights[MAX_ROWS];
+  BOOLEAN     Headers[MAX_ROWS];
+  UINTN       Count = AppRows (A, Rows);
+  UINTN       Focus = AppFocusedRow (A, Rows, Count);
+  LIST_STATE *State   = A->Screen == SCREEN_DEVELOPER_OPTIONS
+                          ? &A->DeveloperOptionsList
+                          : &A->Menu;
+  RECT Body = mView.Body;
   RECT    Area;
   RECT    Card;
   LIST    List;
@@ -1223,7 +1226,7 @@ MenuDraw (IN OUT APP *A)
     Heights[Index] = ToPxInt (Headers[Index] ? 22 : 30);
   }
   ListInit (&List, Area, ToPxInt (14), Count, Heights, Headers);
-  ListPlace (&List, Focus, &A->Menu.Scroll);
+  ListPlace (&List, Focus, &State->Scroll);
   for (UINTN Index = List.First; Index < List.End; Index++) {
     RECT Row = ListRow (&List, Index);
     if (Rows[Index].Header) {
@@ -1947,9 +1950,9 @@ OverlayDraw (IN CONST APP *A)
 STATIC BOOLEAN
 HasFooter (IN CONST APP *A)
 {
-  return A->Screen == SCREEN_MENU || A->Screen == SCREEN_MODELS ||
-         A->Screen == SCREEN_ENTRIES || A->Screen == SCREEN_CONFIRM ||
-         A->Screen == SCREEN_LINES;
+  return A->Screen == SCREEN_MENU || A->Screen == SCREEN_DEVELOPER_OPTIONS ||
+         A->Screen == SCREEN_MODELS || A->Screen == SCREEN_ENTRIES ||
+         A->Screen == SCREEN_CONFIRM || A->Screen == SCREEN_LINES;
 }
 
 // The toast sits above the footer, or above the body's end on a screen
@@ -2070,6 +2073,7 @@ Build (IN OUT APP *A)
     }
     switch (Screen) {
     case SCREEN_MENU:
+    case SCREEN_DEVELOPER_OPTIONS:
     case SCREEN_CONFIRM:
       MenuDraw (A);
       break;

@@ -46,14 +46,14 @@ typedef enum {
   REBOOT_OTHER_SLOT,
 } REBOOT_TARGET;
 
-// Switches in the Debug section. All are off unless turned on there.
-typedef struct _EXPERIMENTS {
+// The developer options. All are off unless turned on there.
+typedef struct _DEVELOPER_OPTIONS {
   BOOLEAN UsbLive;
   BOOLEAN Quiesce;
   BOOLEAN PanelLinesOff;
-  BOOLEAN BootLog;       // SETTINGS_DEBUG_BOOT_LOG
-  BOOLEAN SdDiagnostics; // SETTINGS_DEBUG_SD_DIAGNOSTICS
-} EXPERIMENTS;
+  BOOLEAN BootLog;       // SETTINGS_BOOT_LOG
+  BOOLEAN SdDiagnostics; // SETTINGS_SD_DIAGNOSTICS
+} DEVELOPER_OPTIONS;
 
 typedef enum {
   COMMAND_NONE,
@@ -66,15 +66,15 @@ typedef enum {
   COMMAND_UNINSTALL_CFW,
   COMMAND_DEVICE_INFO,
   COMMAND_LOG,
-  COMMAND_SAVE_EXPERIMENTS, // saves Experiments
+  COMMAND_SAVE_DEVELOPER_OPTIONS, // saves DeveloperOptions
 } COMMAND_KIND;
 
 // Work for the platform. Run it after the next frame, so the screen
 // already shows what's happening.
 typedef struct _COMMAND {
-  COMMAND_KIND Kind;
-  INT32        Arg;
-  EXPERIMENTS  Experiments;
+  COMMAND_KIND      Kind;
+  INT32             Arg;
+  DEVELOPER_OPTIONS DeveloperOptions;
 } COMMAND;
 
 typedef enum {
@@ -149,11 +149,13 @@ typedef enum {
   ITEM_UNINSTALL,
   ITEM_DEVICE_INFO,
   ITEM_LOG,
+  ITEM_DEVELOPER_OPTIONS, // opens the developer options
   ITEM_USB_LIVE,
   ITEM_QUIESCE,
   ITEM_PANEL_LINES,
   ITEM_BOOT_LOG,
   ITEM_SD_DIAGNOSTICS,
+  ITEM_DEVELOPER_OPTIONS_BACK, // leaves the developer options
   ITEM_POWER_OFF,
 } ITEM;
 
@@ -178,6 +180,7 @@ typedef struct _ITEM_VIEW {
 
 typedef enum {
   SCREEN_MENU,
+  SCREEN_DEVELOPER_OPTIONS, // a list like the menu's
   SCREEN_SCANNING,
   SCREEN_MODELS,
   SCREEN_ENTRIES,
@@ -282,8 +285,9 @@ typedef struct _APP {
   ITEM         LinesFrom;
   LIST_STATE   InfoList;
 
-  EXPERIMENTS Experiments;
-  INT32       Booting; // the entry picked from the list, or -1
+  DEVELOPER_OPTIONS DeveloperOptions;
+  LIST_STATE        DeveloperOptionsList;
+  INT32             Booting; // the entry picked from the list, or -1
 
   CHAR8   Toast[160];
   UINT64  ToastUntil; // 0 for no toast
@@ -374,9 +378,9 @@ AppSetFirmwareRotation (
 );
 
 VOID
-AppSetExperiments (
-  IN OUT APP           *A,
-  IN CONST EXPERIMENTS *Experiments
+AppSetDeveloperOptions (
+  IN OUT APP                 *A,
+  IN CONST DEVELOPER_OPTIONS *DeveloperOptions
 );
 
 // Lists from the platform are copied, up to MAX_ENTRIES, MAX_MODELS and
@@ -464,7 +468,8 @@ AppDesiredRotation (IN CONST APP *A);
 
 // For the view
 
-// Fills Rows (MAX_ROWS long) with headers and items and returns the count.
+// Fills Rows (MAX_ROWS long) with the headers and items of the menu, or of
+// the developer options while they show, and returns the count.
 UINTN
 AppRows (
   IN CONST APP *A,
