@@ -46,11 +46,13 @@ typedef enum {
   REBOOT_OTHER_SLOT,
 } REBOOT_TARGET;
 
-// Switches in the Debug section, which only debug builds have.
+// Switches in the Debug section. All are off unless turned on there.
 typedef struct _EXPERIMENTS {
   BOOLEAN UsbLive;
   BOOLEAN Quiesce;
   BOOLEAN PanelLinesOff;
+  BOOLEAN BootLog;       // SETTINGS_DEBUG_BOOT_LOG
+  BOOLEAN SdDiagnostics; // SETTINGS_DEBUG_SD_DIAGNOSTICS
 } EXPERIMENTS;
 
 typedef enum {
@@ -150,6 +152,8 @@ typedef enum {
   ITEM_USB_LIVE,
   ITEM_QUIESCE,
   ITEM_PANEL_LINES,
+  ITEM_BOOT_LOG,
+  ITEM_SD_DIAGNOSTICS,
   ITEM_POWER_OFF,
 } ITEM;
 
@@ -243,7 +247,6 @@ typedef struct _APP {
   DEVICE_INFO   Info;
   SCHEME        Scheme;
   CONST CHAR8  *Version;
-  BOOLEAN       Debug; // show the Debug section
   // The panel's size in pixels, before any rotation.
   UINT32 PhysicalW, PhysicalH;
   UINT16 FirmwareRotation;

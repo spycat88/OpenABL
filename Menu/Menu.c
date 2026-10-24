@@ -77,6 +77,18 @@ MenuVarIs (
   return Is;
 }
 
+BOOLEAN
+MenuDebugOption (IN UINT8 Bit)
+{
+  OABL_BUFFER Stored = {0};
+  BOOLEAN     Set =
+    MenuVarGet (SETTINGS_KEY_DEBUG, &Stored) && Stored.Len == 1 &&
+    (Stored.Data[0] & Bit) != 0;
+
+  BufferFree (&Stored);
+  return Set;
+}
+
 // Like MenuVarPut, but only logs a failure.
 STATIC VOID
 VarSet (
@@ -1197,9 +1209,7 @@ LogLines (
 
 // Debug section
 
-#ifdef OABL_DEBUG
-// Reads the Debug section's switches. A missing variable means the build's
-// default.
+// Reads the Debug section's switches. A missing variable means off.
 STATIC EXPERIMENTS
 Experiments (VOID)
 {
@@ -1214,6 +1224,8 @@ Experiments (VOID)
     .UsbLive       = MenuVarIs (SETTINGS_KEY_USB_HOST_LIVE, 1),
     .Quiesce       = Quiesce & 1,
     .PanelLinesOff = (Quiesce & 2) != 0,
+    .BootLog       = MenuDebugOption (SETTINGS_DEBUG_BOOT_LOG),
+    .SdDiagnostics = MenuDebugOption (SETTINGS_DEBUG_SD_DIAGNOSTICS),
   };
 }
 
@@ -1223,7 +1235,10 @@ SaveExperiments (IN EXPERIMENTS Want)
 {
   STATIC CONST UINT8 One     = 1;
   UINT8              Quiesce = (UINT8)(Want.Quiesce | Want.PanelLinesOff << 1);
-  EFI_STATUS         Status =
+  UINT8              Debug =
+    (UINT8)((Want.BootLog ? SETTINGS_DEBUG_BOOT_LOG : 0) |
+            (Want.SdDiagnostics ? SETTINGS_DEBUG_SD_DIAGNOSTICS : 0));
+  EFI_STATUS Status =
     MenuVarPut (SETTINGS_KEY_USB_HOST_LIVE, &One, Want.UsbLive ? 1 : 0);
 
   if (EFI_ERROR (Status)) {
@@ -1233,15 +1248,20 @@ SaveExperiments (IN EXPERIMENTS Want)
   if (EFI_ERROR (Status)) {
     return Status;
   }
+  Status = MenuVarPut (SETTINGS_KEY_DEBUG, &Debug, Debug ? 1 : 0);
+  if (EFI_ERROR (Status)) {
+    return Status;
+  }
   MenuFlush ();
   MenuLog (
-    "experiments: live USB host %s, display parked %s, panel lines off %s",
+    "experiments: live USB host %s, display parked %s, panel lines off %s, "
+    "boot log on screen %s, SD diagnostics %s",
     Want.UsbLive ? "on" : "off", Want.Quiesce ? "on" : "off",
-    Want.PanelLinesOff ? "on" : "off"
+    Want.PanelLinesOff ? "on" : "off", Want.BootLog ? "on" : "off",
+    Want.SdDiagnostics ? "on" : "off"
   );
   return EFI_SUCCESS;
 }
-#endif
 
 // Commands
 
@@ -1424,7 +1444,6 @@ RunCommand (
     break;
   }
   case COMMAND_SAVE_EXPERIMENTS: {
-#ifdef OABL_DEBUG
     EXPERIMENTS Want = Command.Experiments;
     EXPERIMENTS Now;
     BOOLEAN     Ok = M->Writable && SaveExperiments (Want) == EFI_SUCCESS;
@@ -1432,10 +1451,11 @@ RunCommand (
     Now = Experiments ();
     AppSetExperiments (&mApp, &Now);
     if (!Ok || Now.UsbLive != Want.UsbLive || Now.Quiesce != Want.Quiesce ||
-        Now.PanelLinesOff != Want.PanelLinesOff) {
+        Now.PanelLinesOff != Want.PanelLinesOff ||
+        Now.BootLog != Want.BootLog ||
+        Now.SdDiagnostics != Want.SdDiagnostics) {
       AppOnFailed (&mApp, gStrings->AblSettingFailed);
     }
-#endif
     break;
   }
   case COMMAND_LOG: {
@@ -1596,9 +1616,6 @@ MenuRun (
 #ifdef OABL_STANDARD_BOOT
   FillEntries (&M, &mApp);
 #endif
-#ifdef OABL_DEBUG
-  mApp.Debug = TRUE;
-#endif
   AppSetPhysicalSize (&mApp, (UINT32)PanelW, (UINT32)PanelH);
   if (QcomFirmwarePanelRotation (PanelW, PanelH, &FirmwareRotation)) {
     AppSetFirmwareRotation (&mApp, FirmwareRotation);
@@ -1606,12 +1623,10 @@ MenuRun (
       MenuLog ("XBL turns the panel by %u\xc2\xb0", FirmwareRotation);
     }
   }
-#ifdef OABL_DEBUG
   {
     EXPERIMENTS Switches = Experiments ();
     AppSetExperiments (&mApp, &Switches);
   }
-#endif
   AppStart (&mApp, ClockNowMs (), TRUE);
   {
     BOOLEAN      Ok;

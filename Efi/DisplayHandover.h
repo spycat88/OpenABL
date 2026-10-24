@@ -17,8 +17,7 @@
 
 #include <Protocol/OpenAblMenuHost.h>
 
-// Returns the DisplayQuiesce byte, or 0 if it isn't set. Without
-// OABL_DISPLAY_QUIESCE the display-off bits (QUIESCE, LINES_OFF) read clear.
+// Returns the DisplayQuiesce byte, or 0 if it isn't set.
 UINT8
 DisplayHandoverQuiesceSetting (VOID);
 
@@ -26,7 +25,6 @@ DisplayHandoverQuiesceSetting (VOID);
 VOID
 DisplayHandoverQuiesce (IN OPENABL_STORAGE_LOG Log OPTIONAL);
 
-#ifdef OABL_DISPLAY_QUIESCE
 // Switches the backlight off for the selected device model. Do this before
 // the display-off so XBL's DSI stop and the kernel's panel reset happen in
 // the dark.
@@ -37,7 +35,6 @@ DisplayHandoverBacklightOff (IN OPENABL_STORAGE_LOG Log OPTIONAL);
 // protocol leaves them on, so call this after DisplayHandoverQuiesce.
 VOID
 DisplayHandoverSuppliesOff (IN OPENABL_STORAGE_LOG Log OPTIONAL);
-#endif
 
 // The hand-over, run at ExitBootServices. KeepAlive leaves the display on,
 // unless DisplayQuiesce forces it off.

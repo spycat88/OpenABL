@@ -82,6 +82,10 @@ MenuVarIs (
   IN UINT8        Value
 );
 
+// Returns TRUE if DebugOptions has Bit (a SETTINGS_DEBUG_* bit) set.
+BOOLEAN
+MenuDebugOption (IN UINT8 Bit);
+
 // Commits written variables to flash (XBL's FlushVariableNV).
 VOID
 MenuFlush (VOID);

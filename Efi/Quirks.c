@@ -104,8 +104,6 @@ Matches (
 }
 
 // Unaligned reads from a mapped image.
-#if defined(OABL_SDCC_SM4450) || defined(OABL_SDCC_SM6450) ||                  \
-  defined(OABL_SDCC_SM7675) || defined(OABL_SD_DIAGNOSTICS)
 STATIC UINT32
 ReadU32 (IN UINT64 Address)
 {
@@ -114,7 +112,6 @@ ReadU32 (IN UINT64 Address)
   CopyMem (&Value, (CONST VOID *)(UINTN)Address, sizeof (Value));
   return Value;
 }
-#endif
 
 STATIC UINT64
 ReadU64 (IN UINT64 Address)
@@ -888,7 +885,6 @@ SdCmdPullup (IN LOG_SINK Log)
 
 // SdccDxe: the slot state its detection left
 
-#ifdef OABL_SD_DIAGNOSTICS
 // The SD card's slot in SdccDxe's table (SDCC_BSP_SLOT_1, SDC2) and the
 // table's stride (sdcc_slot_type, 0x100 on the MXF builds).
 #define SD_SLOT     1ull
@@ -1093,11 +1089,11 @@ SdSlotReport (
     (UINT64)Status, CardName (Class), (UINT64)Rca, (UINT64)Sectors
   );
 }
-#endif // OABL_SD_DIAGNOSTICS
 
 UINT32
 QuirksSdccUhs (
   IN UINT32   Chip,
+  IN BOOLEAN  Diagnostics,
   IN LOG_SINK Log
 )
 {
@@ -1186,11 +1182,9 @@ QuirksSdccUhs (
     }
   }
 #endif
-#ifdef OABL_SD_DIAGNOSTICS
-  if (Sites.Count > 0) {
+  if (Diagnostics && Sites.Count > 0) {
     SdSlotReport (Sites.Items[0], "before", Log);
   }
-#endif
 #ifdef OABL_SDCC_SM7675
   Pulled = Chip == SM7675_G2 && SdCmdPullup (Log);
 #endif
@@ -1211,11 +1205,9 @@ QuirksSdccUhs (
       Ok ? "done" : "REFUSED"
     );
   }
-#ifdef OABL_SD_DIAGNOSTICS
-  if (Sites.Count > 0) {
+  if (Diagnostics && Sites.Count > 0) {
     SdSlotReport (Sites.Items[0], "after", Log);
   }
-#endif
   VecFree (&Tries);
   VecFree (&Sites);
   return Patched;
