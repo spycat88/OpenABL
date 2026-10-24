@@ -62,7 +62,12 @@ In the menu, Volume Up and Down move the selection and Power selects.
 | Uninstall CFW | Removes a Linux install from internal storage, after a confirmation. Shown only when one is installed. |
 | Power off | Shuts down. |
 
-Settings are stored as UEFI variables and kept across restarts.
+Settings are kept across restarts in the last 4 KiB of the `misc` partition,
+on every chipset. Android's bootloader message and the rest of its data in
+the first 64 KiB of `misc` are left alone, and the end of `misc` is only
+written when it is blank or already holds OpenABL's settings. Settings
+from older OpenABLs (UEFI variables, or `devinfo` on SDM845) aren't carried
+over: the first boot starts at the defaults.
 
 **Boot logo:** with *Custom boot logo* on, put uncompressed 24- or 32-bit
 BMP files in a `\logo` folder on a drive the boot source can use, such as the SD card's boot

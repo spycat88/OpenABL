@@ -4,7 +4,7 @@
  */
 
 /**
-  SettingsStore - Settings copy in devinfo, for XBL without variable services.
+  SettingsStore - named variables in the last 4 KiB of the misc partition.
 */
 
 #include "Core/SettingsStore.h"
@@ -12,260 +12,354 @@
 #include "Base/Buffer.h"
 #include "Base/Memory.h"
 
-#define FORMAT    1
-#define VALUE_MAX 32
+// Header offsets.
+#define OFF_MAGIC     0
+#define OFF_VERSION   8
+#define OFF_SIZE      10
+#define OFF_CRC       12
+#define OFF_COUNT     16
+#define OFF_HEAP_USED 18
 
-// How a variable's value is encoded in a field.
-typedef enum {
-  // One byte, from 0 to the field's maximum.
-  KIND_BYTE,
-  // A 16-bit rotation: 0xFFFF (none or Auto), 0, 90, 180 or 270.
-  KIND_ROTATION,
-} KIND;
+// Index entry offsets.
+#define ENTRY_OFFSET   0
+#define ENTRY_DATA_LEN 2
+#define ENTRY_NAME_LEN 4
 
-// A small setting and its place in the bitfield.
-typedef struct {
-  CONST CHAR8 *Key;
-  UINT8        At;
-  UINT8        Width;
-  KIND         Kind;
-} FIELD;
+#define MAGIC     "OABLVARS"
+#define MAGIC_LEN 8
 
-STATIC CONST FIELD mFields[] = {
-  {SETTINGS_KEY_BOOT_MODE, 0, 2, KIND_BYTE},
-  {SETTINGS_KEY_ABL_MODE, 2, 2, KIND_BYTE},
-  {SETTINGS_KEY_ALT_VOLUME_UP, 4, 2, KIND_BYTE},
-  {SETTINGS_KEY_OFFMODE_CHARGING, 6, 2, KIND_BYTE},
-  {SETTINGS_KEY_SHOW_MODEL_MENU, 8, 2, KIND_BYTE},
-  {SETTINGS_KEY_CUSTOM_LOGO, 10, 2, KIND_BYTE},
-  // Bits 12-13 are unused (they held KeepLogo).
-  {SETTINGS_KEY_USB_HOST_LIVE, 14, 2, KIND_BYTE},
-  {SETTINGS_KEY_BOOT_SOURCE, 16, 3, KIND_BYTE},
-  {SETTINGS_KEY_BOOT_FAILURE, 19, 4, KIND_BYTE},
-  {SETTINGS_KEY_DISPLAY_QUIESCE, 23, 4, KIND_BYTE},
-  {SETTINGS_KEY_MENU_TIMEOUT, 27, 4, KIND_BYTE},
-  {SETTINGS_KEY_ROTATION, 31, 3, KIND_ROTATION},
-  {SETTINGS_KEY_MODEL_ROTATION, 34, 3, KIND_ROTATION},
-  {SETTINGS_KEY_LANGUAGE, 37, 3, KIND_BYTE},
-};
+_Static_assert (SETTINGS_STORE_HEAP_SIZE > 0, "heap");
 
-#define FIELD_COUNT (sizeof (mFields) / sizeof (*mFields))
-
-_Static_assert (
-  FIELD_COUNT + 1 == SETTINGS_STORE_SKIPPED_MAX,
-  "skipped"
-);
-_Static_assert (
-  FIELD_COUNT + 3 == SETTINGS_STORE_VARS,
-  "vars"
-);
-_Static_assert (
-  VALUE_MAX *SETTINGS_STORE_MODEL_ENTRIES <= SETTINGS_MAX_MODEL_LEN,
-  "model"
-);
-
-STATIC CONST UINT16 mRotations[] = {0xFFFF, 0, 90, 180, 270};
-
-CONST CHAR8 *CONST gSettingsStoreModelEntries[SETTINGS_STORE_MODEL_ENTRIES] = {
-  "OablModel0", "OablModel1", "OablModel2"};
-
-STATIC UINT32
-Fnv1a (
-  IN CONST UINT8 *Bytes,
-  IN UINTN        Size
+STATIC UINT8 *
+Entry (
+  IN CONST UINT8 *Store,
+  IN UINTN        Index
 )
 {
-  UINT32 Hash = 0x811c9dc5;
-
-  for (UINTN Index = 0; Index < Size; Index++) {
-    Hash = (Hash ^ Bytes[Index]) * 0x01000193;
-  }
-  return Hash;
+  return (UINT8 *)Store + SETTINGS_STORE_HEADER_SIZE +
+         Index * SETTINGS_STORE_ENTRY_SIZE;
 }
 
-// Encodes a value as its field code, 0 if unset. Fails if it doesn't fit.
+STATIC UINTN
+Count (IN CONST UINT8 *Store)
+{
+  return ReadLe16 (Store + OFF_COUNT);
+}
+
+STATIC UINTN
+HeapUsed (IN CONST UINT8 *Store)
+{
+  return ReadLe16 (Store + OFF_HEAP_USED);
+}
+
 STATIC BOOLEAN
-FieldCode (
-  IN CONST FIELD       *Field,
-  IN BOOLEAN            Found,
-  IN CONST OABL_BUFFER *Value,
-  OUT UINT64           *Code
+HasMagic (IN CONST UINT8 *Store)
+{
+  return CompareMem (Store + OFF_MAGIC, MAGIC, MAGIC_LEN) == 0;
+}
+
+// The CRC-32 of everything after the CRC field.
+STATIC UINT32
+StoreCrc (IN CONST UINT8 *Store)
+{
+  return CalculateCrc32 (
+    Store + OFF_CRC + 4, SETTINGS_STORE_SIZE - OFF_CRC - 4
+  );
+}
+
+// The magic, the size and the CRC, which every version keeps.
+STATIC BOOLEAN
+Sealed (IN CONST UINT8 *Store)
+{
+  return HasMagic (Store) &&
+         ReadLe16 (Store + OFF_SIZE) == SETTINGS_STORE_SIZE &&
+         ReadLe32 (Store + OFF_CRC) == StoreCrc (Store);
+}
+
+STATIC OABL_BYTES
+NameAt (
+  IN CONST UINT8 *Store,
+  IN UINTN        Index
 )
 {
-  UINT64 Number;
+  CONST UINT8 *At = Entry (Store, Index);
 
-  *Code = 0;
-  if (!Found) {
-    return TRUE;
+  return BytesOf (
+    Store + SETTINGS_STORE_HEAP_START + ReadLe16 (At + ENTRY_OFFSET),
+    At[ENTRY_NAME_LEN]
+  );
+}
+
+STATIC OABL_BYTES
+DataAt (
+  IN CONST UINT8 *Store,
+  IN UINTN        Index
+)
+{
+  CONST UINT8 *At = Entry (Store, Index);
+
+  return BytesOf (
+    Store + SETTINGS_STORE_HEAP_START + ReadLe16 (At + ENTRY_OFFSET) +
+      At[ENTRY_NAME_LEN],
+    ReadLe16 (At + ENTRY_DATA_LEN)
+  );
+}
+
+STATIC BOOLEAN
+BytesEq (
+  IN OABL_BYTES A,
+  IN OABL_BYTES B
+)
+{
+  return A.Len == B.Len && CompareMem (A.Ptr, B.Ptr, A.Len) == 0;
+}
+
+// Finds Name's entry. Returns Count if it isn't there.
+STATIC UINTN
+Find (
+  IN CONST UINT8 *Store,
+  IN OABL_BYTES   Name
+)
+{
+  UINTN Index;
+
+  for (Index = 0; Index < Count (Store); Index++) {
+    if (BytesEq (NameAt (Store, Index), Name)) {
+      break;
+    }
   }
-  if (Field->Kind == KIND_BYTE && Value->Len == 1) {
-    Number = Value->Data[0];
-  } else if (Field->Kind == KIND_ROTATION && Value->Len == 2) {
-    UINT16 Word = ReadLe16 (Value->Data);
+  return Index;
+}
 
-    for (Number = 0; Number < 5 && mRotations[Number] != Word; Number++)
-      ;
-    if (Number == 5) {
+BOOLEAN
+SettingsStoreValid (IN CONST UINT8 Store[SETTINGS_STORE_SIZE])
+{
+  UINTN Entries = Count (Store);
+  UINTN Used    = HeapUsed (Store);
+
+  if (!Sealed (Store) ||
+      ReadLe16 (Store + OFF_VERSION) != SETTINGS_STORE_VERSION ||
+      Entries > SETTINGS_STORE_ENTRIES || Used > SETTINGS_STORE_HEAP_SIZE) {
+    return FALSE;
+  }
+  for (UINTN Index = 0; Index < Entries; Index++) {
+    CONST UINT8 *At      = Entry (Store, Index);
+    UINTN        NameLen = At[ENTRY_NAME_LEN];
+
+    if (NameLen == 0 || NameLen > SETTINGS_STORE_NAME_MAX ||
+        (UINTN)ReadLe16 (At + ENTRY_OFFSET) + NameLen +
+            ReadLe16 (At + ENTRY_DATA_LEN) >
+          Used) {
       return FALSE;
     }
-  } else {
-    return FALSE;
+    // Names are unique.
+    for (UINTN Other = 0; Other < Index; Other++) {
+      if (BytesEq (NameAt (Store, Other), NameAt (Store, Index))) {
+        return FALSE;
+      }
+    }
   }
-  if (Number + 1 >= 1ull << Field->Width) {
-    return FALSE;
-  }
-  *Code = Number + 1;
   return TRUE;
-}
-
-// Decodes a field code into its variable. Code 0 gives an empty value.
-STATIC VOID
-FieldValue (
-  IN CONST FIELD   *Field,
-  IN UINT64         Code,
-  OUT SETTINGS_VAR *Out
-)
-{
-  Out->Name = Field->Key;
-  Out->Len  = 0;
-  if (Code == 0) {
-    return;
-  }
-  if (Field->Kind == KIND_BYTE) {
-    Out->Value[0] = (UINT8)(Code - 1);
-    Out->Len      = 1;
-  } else if (Code - 1 < 5) {
-    WriteLe16 (Out->Value, mRotations[Code - 1]);
-    Out->Len = 2;
-  }
 }
 
 VOID
-SettingsStorePack (
-  IN SETTINGS_GET         *Get,
-  IN VOID                 *Context OPTIONAL,
-  OUT SETTINGS_STORE_VALUE Out[SETTINGS_STORE_ENTRIES],
-  OUT CONST CHAR8         *Skipped[SETTINGS_STORE_SKIPPED_MAX],
-  OUT UINTN               *SkippedCount
+SettingsStoreFormat (OUT UINT8 Store[SETTINGS_STORE_SIZE])
+{
+  ZeroMem (Store, SETTINGS_STORE_SIZE);
+  CopyMem (Store + OFF_MAGIC, MAGIC, MAGIC_LEN);
+  WriteLe16 (Store + OFF_VERSION, SETTINGS_STORE_VERSION);
+  WriteLe16 (Store + OFF_SIZE, SETTINGS_STORE_SIZE);
+}
+
+// TRUE if every byte of the store is Fill.
+STATIC BOOLEAN
+AllOf (
+  IN CONST UINT8 *Store,
+  IN UINT8        Fill
 )
 {
-  SETTINGS_STORE_VALUE *Entry       = &Out[0];
-  OABL_BUFFER           Value       = {0};
-  UINT64                Bits        = 0;
-  UINT32                RotationFor = 0;
-  BOOLEAN               Fits;
-
-  *SkippedCount = 0;
-  for (UINTN Index = 0; Index < FIELD_COUNT; Index++) {
-    UINT64  Code;
-    BOOLEAN Found = Get (Context, mFields[Index].Key, &Value);
-
-    if (FieldCode (&mFields[Index], Found, &Value, &Code)) {
-      Bits |= Code << mFields[Index].At;
-    } else {
-      Skipped[(*SkippedCount)++] = mFields[Index].Key;
-    }
-    BufferFree (&Value);
-  }
-  *Entry =
-    (SETTINGS_STORE_VALUE){.Name = SETTINGS_STORE_ENTRY, .Len = VALUE_MAX};
-  Entry->Value[0] = FORMAT;
-  if (Get (Context, SETTINGS_KEY_SCHEMA, &Value) && Value.Len) {
-    Entry->Value[1] = Value.Data[0];
-  }
-  BufferFree (&Value);
-  WriteLe64 (Entry->Value + 2, Bits);
-  if (Get (Context, SETTINGS_KEY_MODEL_ROTATION_FOR, &Value) && Value.Len) {
-    RotationFor = Fnv1a (Value.Data, Value.Len);
-  }
-  BufferFree (&Value);
-  WriteLe32 (Entry->Value + 10, RotationFor);
-  // Split the model into 32-byte pieces, or store none if it is too long.
-  if (!Get (Context, SETTINGS_KEY_MODEL, &Value)) {
-    BufferFree (&Value);
-  }
-  Fits = Value.Len <= VALUE_MAX * SETTINGS_STORE_MODEL_ENTRIES;
-  if (!Fits) {
-    Skipped[(*SkippedCount)++] = SETTINGS_KEY_MODEL;
-  }
-  for (UINTN Index = 0; Index < SETTINGS_STORE_MODEL_ENTRIES; Index++) {
-    UINTN At = Index * VALUE_MAX;
-
-    Entry  = &Out[1 + Index];
-    *Entry = (SETTINGS_STORE_VALUE){.Name = gSettingsStoreModelEntries[Index]};
-    Entry->Len = Fits && At < Value.Len ? Value.Len - At : 0;
-    Entry->Len = Entry->Len < VALUE_MAX ? Entry->Len : VALUE_MAX;
-    for (UINTN Byte = 0; Byte < Entry->Len; Byte++) {
-      Entry->Value[Byte] = Value.Data[At + Byte];
+  for (UINTN Index = 0; Index < SETTINGS_STORE_SIZE; Index++) {
+    if (Store[Index] != Fill) {
+      return FALSE;
     }
   }
-  BufferFree (&Value);
+  return TRUE;
+}
+
+SETTINGS_STORE_STATE
+SettingsStoreOpen (IN OUT UINT8 Store[SETTINGS_STORE_SIZE])
+{
+  if (SettingsStoreValid (Store)) {
+    return SETTINGS_STORE_FOUND;
+  }
+  // A newer version's data stays as it is.
+  if (Sealed (Store) &&
+      ReadLe16 (Store + OFF_VERSION) > SETTINGS_STORE_VERSION) {
+    return SETTINGS_STORE_NEWER;
+  }
+  if (HasMagic (Store)) {
+    SettingsStoreFormat (Store);
+    return SETTINGS_STORE_DAMAGED;
+  }
+  if (AllOf (Store, 0x00) || AllOf (Store, 0xFF)) {
+    SettingsStoreFormat (Store);
+    return SETTINGS_STORE_BLANK;
+  }
+  return SETTINGS_STORE_FOREIGN;
 }
 
 BOOLEAN
-SettingsStoreUnpack (
-  IN SETTINGS_STORE_VALUE_OF *ValueOf,
-  IN VOID                    *Context OPTIONAL,
-  OUT SETTINGS_VAR            Out[SETTINGS_STORE_VARS]
-)
+SettingsStoreNameValid (IN CONST CHAR8 *Name)
 {
-  OABL_BYTES    Entry;
-  OABL_BYTES    Piece;
-  SETTINGS_VAR *Model;
-  SETTINGS_VAR *RotationFor;
-  UINT64        Bits;
-  UINT32        Hash;
-  UINTN         Count = 0;
+  UINTN Length = AsciiStrLen (Name);
 
-  if (!ValueOf (Context, SETTINGS_STORE_ENTRY, &Entry) || Entry.Len < 14 ||
-      Entry.Ptr[0] < 1) {
+  if (Length == 0 || Length > SETTINGS_STORE_NAME_MAX) {
     return FALSE;
   }
-  Bits = ReadLe64 (Entry.Ptr + 2);
-  Hash = ReadLe32 (Entry.Ptr + 10);
-  for (UINTN Index = 0; Index < FIELD_COUNT; Index++) {
-    CONST FIELD *Field = &mFields[Index];
-
-    FieldValue (
-      Field, (Bits >> Field->At) & ((1ull << Field->Width) - 1), &Out[Count++]
-    );
-  }
-  Out[Count] = (SETTINGS_VAR){.Name = SETTINGS_KEY_SCHEMA};
-  if (Entry.Ptr[1]) {
-    Out[Count].Value[0] = Entry.Ptr[1];
-    Out[Count].Len      = 1;
-  }
-  Count++;
-  Model  = &Out[Count++];
-  *Model = (SETTINGS_VAR){.Name = SETTINGS_KEY_MODEL};
-  for (UINTN Index = 0; Index < SETTINGS_STORE_MODEL_ENTRIES; Index++) {
-    if (!ValueOf (Context, gSettingsStoreModelEntries[Index], &Piece)) {
-      continue;
+  for (UINTN Index = 0; Index < Length; Index++) {
+    if ((UINT8)Name[Index] < 0x21 || (UINT8)Name[Index] > 0x7e) {
+      return FALSE;
     }
-    // devinfo values are at most 32 bytes, so all three pieces fit.
-    for (UINTN Byte = 0;
-         Byte < Piece.Len && Model->Len < SETTINGS_MAX_MODEL_LEN; Byte++) {
-      Model->Value[Model->Len++] = Piece.Ptr[Byte];
-    }
-  }
-  RotationFor  = &Out[Count++];
-  *RotationFor = (SETTINGS_VAR){.Name = SETTINGS_KEY_MODEL_ROTATION_FOR};
-  if (Hash != 0 && Model->Len && Fnv1a (Model->Value, Model->Len) == Hash) {
-    CopyMem (RotationFor->Value, Model->Value, Model->Len);
-    RotationFor->Len = Model->Len;
   }
   return TRUE;
 }
 
 BOOLEAN
-SettingsStoreCovers (IN CONST CHAR8 *Key)
+SettingsStoreGet (
+  IN CONST UINT8  Store[SETTINGS_STORE_SIZE],
+  IN CONST CHAR8 *Name,
+  OUT OABL_BYTES *Value
+)
 {
-  for (UINTN Index = 0; Index < FIELD_COUNT; Index++) {
-    if (AsciiStrEq (mFields[Index].Key, Key)) {
-      return TRUE;
+  UINTN Index = Find (Store, BytesOf (Name, AsciiStrLen (Name)));
+
+  if (Index == Count (Store)) {
+    return FALSE;
+  }
+  *Value = DataAt (Store, Index);
+  return TRUE;
+}
+
+// The heap bytes the records use, leaving out entry Skip.
+STATIC UINTN
+LiveBytes (
+  IN CONST UINT8 *Store,
+  IN UINTN        Skip
+)
+{
+  UINTN Live = 0;
+
+  for (UINTN Index = 0; Index < Count (Store); Index++) {
+    if (Index != Skip) {
+      Live += NameAt (Store, Index).Len + DataAt (Store, Index).Len;
     }
   }
-  return AsciiStrEq (Key, SETTINGS_KEY_SCHEMA) ||
-         AsciiStrEq (Key, SETTINGS_KEY_MODEL) ||
-         AsciiStrEq (Key, SETTINGS_KEY_MODEL_ROTATION_FOR);
+  return Live;
+}
+
+// Packs the heap, keeping the records in index order.
+STATIC VOID
+Pack (IN OUT UINT8 *Store)
+{
+  UINT8 Heap[SETTINGS_STORE_HEAP_SIZE];
+  UINTN Used = 0;
+
+  for (UINTN Index = 0; Index < Count (Store); Index++) {
+    UINT8     *At     = Entry (Store, Index);
+    OABL_BYTES Name   = NameAt (Store, Index);
+    UINTN      Record = Name.Len + ReadLe16 (At + ENTRY_DATA_LEN);
+
+    CopyMem (Heap + Used, Name.Ptr, Record);
+    WriteLe16 (At + ENTRY_OFFSET, (UINT16)Used);
+    Used += Record;
+  }
+  ZeroMem (Store + SETTINGS_STORE_HEAP_START, SETTINGS_STORE_HEAP_SIZE);
+  CopyMem (Store + SETTINGS_STORE_HEAP_START, Heap, Used);
+  WriteLe16 (Store + OFF_HEAP_USED, (UINT16)Used);
+}
+
+// Removes entry Index and packs the heap.
+STATIC VOID
+Remove (
+  IN OUT UINT8 *Store,
+  IN UINTN      Index
+)
+{
+  UINTN Entries = Count (Store);
+
+  for (UINTN Later = Index + 1; Later < Entries; Later++) {
+    CopyMem (
+      Entry (Store, Later - 1), Entry (Store, Later), SETTINGS_STORE_ENTRY_SIZE
+    );
+  }
+  Entries--;
+  ZeroMem (Entry (Store, Entries), SETTINGS_STORE_ENTRY_SIZE);
+  WriteLe16 (Store + OFF_COUNT, (UINT16)Entries);
+  Pack (Store);
+}
+
+BOOLEAN
+SettingsStoreSet (
+  IN OUT UINT8    Store[SETTINGS_STORE_SIZE],
+  IN CONST CHAR8 *Name,
+  IN CONST UINT8 *Data OPTIONAL,
+  IN UINTN        Size
+)
+{
+  UINTN      NameLen;
+  UINTN      Entries = Count (Store);
+  UINTN      Index;
+  UINTN      Used;
+  OABL_BYTES Old;
+  UINT8     *At;
+
+  if (!SettingsStoreNameValid (Name)) {
+    return FALSE;
+  }
+  NameLen = AsciiStrLen (Name);
+  Index   = Find (Store, BytesOf (Name, NameLen));
+  if (Size == 0) {
+    if (Index < Entries) {
+      Remove (Store, Index);
+    }
+    return TRUE;
+  }
+  if (Index < Entries) {
+    Old = DataAt (Store, Index);
+    // The same size: in place.
+    if (Old.Len == Size) {
+      CopyMem ((UINT8 *)Old.Ptr, Data, Size);
+      return TRUE;
+    }
+  } else if (Entries == SETTINGS_STORE_ENTRIES) {
+    return FALSE;
+  }
+  // Check the fit before anything is removed, so a failure changes nothing.
+  if (Size > SETTINGS_STORE_HEAP_SIZE ||
+      LiveBytes (Store, Index) + NameLen + Size > SETTINGS_STORE_HEAP_SIZE) {
+    return FALSE;
+  }
+  if (Index < Entries) {
+    Remove (Store, Index);
+    Entries--;
+  } else if (HeapUsed (Store) + NameLen + Size > SETTINGS_STORE_HEAP_SIZE) {
+    Pack (Store);
+  }
+  Used = HeapUsed (Store);
+  At   = Entry (Store, Entries);
+  ZeroMem (At, SETTINGS_STORE_ENTRY_SIZE);
+  WriteLe16 (At + ENTRY_OFFSET, (UINT16)Used);
+  WriteLe16 (At + ENTRY_DATA_LEN, (UINT16)Size);
+  At[ENTRY_NAME_LEN] = (UINT8)NameLen;
+  CopyMem (Store + SETTINGS_STORE_HEAP_START + Used, Name, NameLen);
+  CopyMem (Store + SETTINGS_STORE_HEAP_START + Used + NameLen, Data, Size);
+  WriteLe16 (Store + OFF_COUNT, (UINT16)(Entries + 1));
+  WriteLe16 (Store + OFF_HEAP_USED, (UINT16)(Used + NameLen + Size));
+  return TRUE;
+}
+
+VOID
+SettingsStoreSeal (IN OUT UINT8 Store[SETTINGS_STORE_SIZE])
+{
+  WriteLe32 (Store + OFF_CRC, StoreCrc (Store));
 }

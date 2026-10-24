@@ -19,8 +19,6 @@
 #include "Core/Settings.h"
 #include "Efi/Variables.h"
 
-STATIC EFI_GUID mSettingsVendor = SETTINGS_VENDOR_GUID;
-
 #define LINE_SIZE 160
 
 // Formats a log line on the stack, truncated to fit.
@@ -48,42 +46,15 @@ Say (
   Log (Line);
 }
 
-// Reads setting Name into Buffer. Returns FALSE if it isn't set.
-STATIC BOOLEAN
-Setting (
-  IN CONST CHAR8 *Name,
-  OUT UINT8      *Buffer,
-  IN UINTN        Capacity,
-  OUT UINTN      *Length
-)
-{
-  CHAR16 WideName[32];
-  UINTN  Size = Capacity;
-  UINTN  Index;
-
-  for (Index = 0; Name[Index]; Index++) {
-    if (Index + 1 >= sizeof (WideName) / sizeof (*WideName) ||
-        (UINT8)Name[Index] >= 0x80) {
-      return FALSE;
-    }
-    WideName[Index] = (CHAR16)Name[Index];
-  }
-  WideName[Index] = 0;
-  if (gRT->GetVariable (WideName, &mSettingsVendor, NULL, &Size, Buffer) !=
-      EFI_SUCCESS) {
-    return FALSE;
-  }
-  *Length = Size;
-  return TRUE;
-}
-
 UINT8
 DisplayHandoverQuiesceSetting (VOID)
 {
   UINT8   Bytes[8];
   UINTN   Length;
   BOOLEAN Stored =
-    Setting (SETTINGS_KEY_DISPLAY_QUIESCE, Bytes, sizeof (Bytes), &Length) &&
+    VariablesPeek (
+      SETTINGS_KEY_DISPLAY_QUIESCE, Bytes, sizeof (Bytes), &Length
+    ) &&
     Length;
   UINT8 Byte = Stored ? Bytes[0] : 0;
 
@@ -490,6 +461,9 @@ DisplayHandoverArm (IN OPENABL_STORAGE_LOG Log OPTIONAL)
   if (Event) {
     return;
   }
+  // Read the settings now: at ExitBootServices only the copy in memory is
+  // read.
+  VariablesLoad (LOG_QUIET);
   mPower = LocateProtocol (&gEfiDisplayPowerStateProtocolGuid);
   if (!mPower) {
     Say (Log, "arm: no display power protocol");

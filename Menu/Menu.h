@@ -82,7 +82,7 @@ MenuVarIs (
   IN UINT8        Value
 );
 
-// Commits written variables to flash (XBL's FlushVariableNV).
+// Writes the changed settings to misc, logging a failure.
 VOID
 MenuFlush (VOID);
 
@@ -90,7 +90,8 @@ MenuFlush (VOID);
 SETTINGS_CAPS
 MenuCapsOf (IN CONST MENU_HOST_STATE *State);
 
-// Reads the settings from their variables, if they have been moved there.
+// Reads the settings from misc. FALSE if misc has no settings, as it can't
+// be written.
 BOOLEAN
 MenuStoredSettings (
   IN CONST MENU_HOST_STATE *State,

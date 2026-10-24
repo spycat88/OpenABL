@@ -88,23 +88,17 @@ VarSet (
   EFI_STATUS Status = MenuVarPut (Name, Data, Size);
 
   if (EFI_ERROR (Status)) {
-    MenuLog ("SetVariable %s failed: %s", Name, MENU_STATUS (Status));
+    MenuLog ("setting %s failed: %s", Name, MENU_STATUS (Status));
   }
 }
 
 VOID
 MenuFlush (VOID)
 {
-  EFI_STATUS Status;
+  EFI_STATUS Status = VariablesFlush ();
 
-  if (QcomFlushVariables (&Status) &&
-      (EFI_ERROR (Status) || Status == EFI_WARN_WRITE_FAILURE)) {
-    MenuLog (
-      "%s%s",
-      QcomHasVariableServices () ? "FlushVariableNV: "
-                                 : "the settings into devinfo: ",
-      MENU_STATUS (Status)
-    );
+  if (EFI_ERROR (Status)) {
+    MenuLog ("saving the settings to misc: %s", MENU_STATUS (Status));
   }
 }
 
@@ -399,8 +393,8 @@ MenuNew (
   M->Writable = MenuStoredSettings (&State, &M->Caps, &M->Stored);
   if (!M->Writable) {
     MenuLog (
-      "the settings aren't in UEFI variables (they couldn't be written): "
-      "shown, not changed"
+      "the settings aren't in misc (it couldn't be written): shown, not "
+      "changed"
     );
     MenuSettingsOf (&State, &M->Stored);
   }
@@ -464,9 +458,7 @@ Save (
   }
   Count = Kept;
   if (Count && !M->Writable) {
-    MenuLog (
-      "the settings aren't in UEFI variables: they can't be changed here"
-    );
+    MenuLog ("the settings aren't in misc: they can't be changed here");
     return gStrings->AblSettingFailed;
   }
   for (UINTN Index = 0; Index < Count; Index++) {

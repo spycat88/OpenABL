@@ -183,8 +183,8 @@ SETTINGS_GET (
   IN OUT OABL_BUFFER *Out
 );
 
-// Returns TRUE if the settings are in variables. Efi/Variables.c moves
-// them there from devinfo, which keeps them until that succeeds.
+// Returns TRUE if the settings are in variables. Efi/Variables.c sets the
+// schema once the store in misc is set up.
 BOOLEAN
 SettingsInVars (
   IN SETTINGS_GET *Get,

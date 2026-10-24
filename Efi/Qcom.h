@@ -7,8 +7,7 @@
   Qcom - calls into Qualcomm's XBL protocols, made as LinuxLoader makes them.
 
   Layouts come from the ABL's QcomModulePkg/Include/Protocol headers. Only
-  the two whose types appear here are included, since EFIVerifiedBoot.h's
-  enum values (READ_CONFIG, GREEN, RED, ...) would reach every includer.
+  the two whose types appear here are included.
   XBL installs ChipInfo under b0760469-970c-487a-a4b5-28db7b45cef1, not the
   61224fbe-b240-4d53-b661-a9a1f343b05c that EFIChipInfo.h defines.
 */
@@ -107,18 +106,6 @@ QcomCardsFree (IN OUT QCOM_CARDS *Cards);
 CHAR8 *
 QcomDisplayPanelConfig (VOID);
 
-// Commits NV variables to storage with FlushVariableNV. On SM8750 a
-// variable that isn't flushed is lost at the next reset; SM8250 flushes on
-// ResetSystem but not on a hard reset. SDM845's XBL has no such protocol,
-// so with OABL_DEVINFO_SETTINGS the variables are packed into devinfo
-// instead. Otherwise FALSE without the protocol.
-BOOLEAN
-QcomFlushVariables (OUT EFI_STATUS *Status);
-
-// TRUE if XBL can commit NV variables (EFI_VARIABLESERVICES_PROTOCOL).
-BOOLEAN
-QcomHasVariableServices (VOID);
-
 // DRAM banks as (base, available length).
 typedef struct _QCOM_BANKS OABL_VEC (CARVEOUTS_REGION) QCOM_BANKS;
 
@@ -127,27 +114,6 @@ typedef struct _QCOM_BANKS OABL_VEC (CARVEOUTS_REGION) QCOM_BANKS;
 // no banks. Caller frees Out with VecFree.
 BOOLEAN
 QcomRamBanks (OUT QCOM_BANKS *Out);
-
-// Reads Length bytes of the devinfo record with VerifiedBoot's
-// VBRwDeviceState (READ_CONFIG), and the protocol's revision. Out is
-// allocated whatever *Status says; caller frees it with BufferFree. FALSE
-// without the protocol or out of memory.
-BOOLEAN
-QcomReadDeviceState (
-  IN UINTN         Length,
-  OUT UINT64      *Revision,
-  OUT EFI_STATUS  *Status,
-  OUT OABL_BUFFER *Out
-);
-
-// Writes the devinfo record with VBRwDeviceState (WRITE_CONFIG). FALSE
-// without the protocol.
-BOOLEAN
-QcomWriteDeviceState (
-  IN UINT8       *Record,
-  IN UINTN        Size,
-  OUT EFI_STATUS *Status
-);
 
 // Finds how XBL rotates the picture on a Width x Height framebuffer, in
 // degrees, from its panel XMLs. FALSE off Qualcomm firmware or if no panel
