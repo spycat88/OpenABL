@@ -543,14 +543,16 @@ AppRows (
   if (SettingsModelVisible (Settings)) {
     ADD_ITEM (ITEM_MODEL);
   }
-  // Experiments, in debug builds only.
-  if (A->Debug && Caps->Embedded) {
+  // Developer switches, all off by default.
+  if (Caps->Embedded) {
     ADD_HEADER (gStrings->SectionDebug);
     if (Caps->UsbHost) {
       ADD_ITEM (ITEM_USB_LIVE);
     }
     ADD_ITEM (ITEM_QUIESCE);
     ADD_ITEM (ITEM_PANEL_LINES);
+    ADD_ITEM (ITEM_BOOT_LOG);
+    ADD_ITEM (ITEM_SD_DIAGNOSTICS);
   }
   ADD_HEADER (gStrings->SectionSystem);
   if (Caps->Log) {
@@ -779,16 +781,39 @@ AppItemView (
     break;
   case ITEM_USB_LIVE:
   case ITEM_QUIESCE:
-  case ITEM_PANEL_LINES: {
-    BOOLEAN On  = Item == ITEM_USB_LIVE  ? A->Experiments.UsbLive
-                  : Item == ITEM_QUIESCE ? A->Experiments.Quiesce
-                                         : A->Experiments.PanelLinesOff;
-    View->Icon  = Item == ITEM_USB_LIVE  ? ICON_USB
-                  : Item == ITEM_QUIESCE ? ICON_MONITOR_OFF
-                                         : ICON_PLUG;
-    View->Label = Item == ITEM_USB_LIVE  ? gStrings->DbgUsbLive
-                  : Item == ITEM_QUIESCE ? gStrings->DbgQuiesce
-                                         : gStrings->DbgPanelLines;
+  case ITEM_PANEL_LINES:
+  case ITEM_BOOT_LOG:
+  case ITEM_SD_DIAGNOSTICS: {
+    CONST EXPERIMENTS *Switches = &A->Experiments;
+    BOOLEAN            On;
+
+    switch (Item) {
+    case ITEM_USB_LIVE:
+      On          = Switches->UsbLive;
+      View->Icon  = ICON_USB;
+      View->Label = gStrings->DbgUsbLive;
+      break;
+    case ITEM_QUIESCE:
+      On          = Switches->Quiesce;
+      View->Icon  = ICON_MONITOR_OFF;
+      View->Label = gStrings->DbgQuiesce;
+      break;
+    case ITEM_PANEL_LINES:
+      On          = Switches->PanelLinesOff;
+      View->Icon  = ICON_PLUG;
+      View->Label = gStrings->DbgPanelLines;
+      break;
+    case ITEM_BOOT_LOG:
+      On          = Switches->BootLog;
+      View->Icon  = ICON_TERMINAL;
+      View->Label = gStrings->DbgBootLog;
+      break;
+    default:
+      On          = Switches->SdDiagnostics;
+      View->Icon  = ICON_SD_CARD;
+      View->Label = gStrings->DbgSdDiagnostics;
+      break;
+    }
     AsciiStrCopy (Value, Cap, On ? gStrings->On : gStrings->Off);
     break;
   }
@@ -877,14 +902,20 @@ Activate (
     return Command (COMMAND_LOG, 0);
   case ITEM_USB_LIVE:
   case ITEM_QUIESCE:
-  case ITEM_PANEL_LINES: {
+  case ITEM_PANEL_LINES:
+  case ITEM_BOOT_LOG:
+  case ITEM_SD_DIAGNOSTICS: {
     COMMAND Save = Command (COMMAND_SAVE_EXPERIMENTS, 0);
     if (Item == ITEM_USB_LIVE) {
       Experiments->UsbLive = !Experiments->UsbLive;
     } else if (Item == ITEM_QUIESCE) {
       Experiments->Quiesce = !Experiments->Quiesce;
-    } else {
+    } else if (Item == ITEM_PANEL_LINES) {
       Experiments->PanelLinesOff = !Experiments->PanelLinesOff;
+    } else if (Item == ITEM_BOOT_LOG) {
+      Experiments->BootLog = !Experiments->BootLog;
+    } else {
+      Experiments->SdDiagnostics = !Experiments->SdDiagnostics;
     }
     Save.Experiments = *Experiments;
     return Save;

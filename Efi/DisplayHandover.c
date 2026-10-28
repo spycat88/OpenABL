@@ -56,12 +56,8 @@ DisplayHandoverQuiesceSetting (VOID)
       SETTINGS_KEY_DISPLAY_QUIESCE, Bytes, sizeof (Bytes), &Length
     ) &&
     Length;
-  UINT8 Byte = Stored ? Bytes[0] : 0;
 
-#ifndef OABL_DISPLAY_QUIESCE
-  Byte &= (UINT8)~(DISPLAY_HANDOVER_QUIESCE | DISPLAY_HANDOVER_LINES_OFF);
-#endif
-  return Byte;
+  return Stored ? Bytes[0] : 0;
 }
 
 // Names the statuses the steps meet. Others print as "error N" in Buffer.
@@ -121,8 +117,6 @@ DisplayHandoverQuiesce (IN OPENABL_STORAGE_LOG Log OPTIONAL)
   Say (Log, "turning the display off through XBL");
   PowerOff (Log);
 }
-
-#ifdef OABL_DISPLAY_QUIESCE
 
 // XBL's TLMM and SPMI protocols. The ABL's tree has no headers for them.
 
@@ -369,8 +363,6 @@ DisplayHandoverSuppliesOff (IN OPENABL_STORAGE_LOG Log OPTIONAL)
   }
 }
 
-#endif // OABL_DISPLAY_QUIESCE
-
 VOID
 DisplayHandoverBeforeExit (
   IN BOOLEAN             KeepAlive,
@@ -390,17 +382,13 @@ DisplayHandoverBeforeExit (
   // turning the backlight off shows as a flash on an LCD, and so does the
   // kernel's panel reset later. The supplies go last because the display
   // power-off leaves them on.
-#ifdef OABL_DISPLAY_QUIESCE
   if (Quiesce & DISPLAY_HANDOVER_LINES_OFF) {
     DisplayHandoverBacklightOff (Log);
   }
-#endif
   DisplayHandoverQuiesce (Log);
-#ifdef OABL_DISPLAY_QUIESCE
   if (Quiesce & DISPLAY_HANDOVER_LINES_OFF) {
     DisplayHandoverSuppliesOff (Log);
   }
-#endif
 }
 
 // What the last tree seen said, if one was.

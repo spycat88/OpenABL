@@ -82,6 +82,10 @@ MenuVarIs (
   IN UINT8        Value
 );
 
+// Returns TRUE if DebugOptions has Bit (a SETTINGS_DEBUG_* bit) set.
+BOOLEAN
+MenuDebugOption (IN UINT8 Bit);
+
 // Writes the changed settings to misc, logging a failure.
 VOID
 MenuFlush (VOID);
