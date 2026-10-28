@@ -1136,6 +1136,8 @@ ReadDeveloperOptions (VOID)
     .PanelLinesOff = (Quiesce & 2) != 0,
     .BootLog       = MenuDeveloperOptionsHas (SETTINGS_BOOT_LOG),
     .SdDiagnostics = MenuDeveloperOptionsHas (SETTINGS_SD_DIAGNOSTICS),
+    .Unlocked =
+      MenuDeveloperOptionsHas (SETTINGS_DEVELOPER_OPTIONS_UNLOCKED),
   };
 }
 
@@ -1146,7 +1148,8 @@ SaveDeveloperOptions (IN DEVELOPER_OPTIONS Want)
   STATIC CONST UINT8 One     = 1;
   UINT8              Quiesce = (UINT8)(Want.Quiesce | Want.PanelLinesOff << 1);
   UINT8              Bits =
-    (UINT8)((Want.BootLog ? SETTINGS_BOOT_LOG : 0) |
+    (UINT8)((Want.Unlocked ? SETTINGS_DEVELOPER_OPTIONS_UNLOCKED : 0) |
+            (Want.BootLog ? SETTINGS_BOOT_LOG : 0) |
             (Want.SdDiagnostics ? SETTINGS_SD_DIAGNOSTICS : 0));
   EFI_STATUS Status =
     MenuVarPut (SETTINGS_KEY_USB_HOST_LIVE, &One, Want.UsbLive ? 1 : 0);
@@ -1165,10 +1168,10 @@ SaveDeveloperOptions (IN DEVELOPER_OPTIONS Want)
   MenuFlush ();
   MenuLog (
     "developer options: live USB host %s, display parked %s, panel lines off "
-    "%s, boot log on screen %s, SD diagnostics %s",
+    "%s, boot log on screen %s, SD diagnostics %s, unlocked %s",
     Want.UsbLive ? "on" : "off", Want.Quiesce ? "on" : "off",
     Want.PanelLinesOff ? "on" : "off", Want.BootLog ? "on" : "off",
-    Want.SdDiagnostics ? "on" : "off"
+    Want.SdDiagnostics ? "on" : "off", Want.Unlocked ? "yes" : "no"
   );
   return EFI_SUCCESS;
 }
@@ -1363,7 +1366,8 @@ RunCommand (
     if (!Ok || Now.UsbLive != Want.UsbLive || Now.Quiesce != Want.Quiesce ||
         Now.PanelLinesOff != Want.PanelLinesOff ||
         Now.BootLog != Want.BootLog ||
-        Now.SdDiagnostics != Want.SdDiagnostics) {
+        Now.SdDiagnostics != Want.SdDiagnostics ||
+        Now.Unlocked != Want.Unlocked) {
       AppOnFailed (&mApp, gStrings->AblSettingFailed);
     }
     break;

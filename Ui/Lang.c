@@ -77,6 +77,11 @@ STATIC CONST LANG_STRINGS mEn = {
   .DeveloperOptionsPanelLines    = "Panel lines off",
   .DeveloperOptionsBootLog       = "Boot log on screen",
   .DeveloperOptionsSdDiagnostics = "SD card diagnostics",
+  .DeveloperOptionsStepsAway     =
+    "You are now {} steps away from unlocking Developer options",
+  .DeveloperOptionsStepAway      =
+    "You are now 1 step away from unlocking Developer options",
+  .DeveloperOptionsUnlocked      = "Developer options are now unlocked!",
 
   .InfoChip          = "Chip",
   .InfoPlatform      = "Platform",
@@ -231,6 +236,9 @@ STATIC CONST LANG_STRINGS mZhHans = {
   .DeveloperOptionsPanelLines    = "关闭面板背光与供电",
   .DeveloperOptionsBootLog       = "屏幕显示启动日志",
   .DeveloperOptionsSdDiagnostics = "SD 卡诊断",
+  .DeveloperOptionsStepsAway     = "再按 {} 次即可解锁开发者选项",
+  .DeveloperOptionsStepAway      = "再按 1 次即可解锁开发者选项",
+  .DeveloperOptionsUnlocked      = "开发者选项已解锁！",
 
   .InfoChip              = "芯片",
   .InfoPlatform          = "平台",
