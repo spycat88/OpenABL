@@ -53,11 +53,19 @@ DisplayHandoverQuiesceSetting (VOID)
   UINTN   Length;
   BOOLEAN Stored =
     VariablesPeek (
-      SETTINGS_KEY_DISPLAY_QUIESCE, Bytes, sizeof (Bytes), &Length
+      SETTINGS_KEY_DEVELOPER_OPTIONS, Bytes, sizeof (Bytes), &Length
     ) &&
     Length;
+  UINT8 Options = Stored ? Bytes[0] : 0;
+  UINT8 Quiesce = 0;
 
-  return Stored ? Bytes[0] : 0;
+  if (Options & SETTINGS_DISPLAY_QUIESCE) {
+    Quiesce |= DISPLAY_HANDOVER_QUIESCE;
+  }
+  if (Options & SETTINGS_PANEL_LINES_OFF) {
+    Quiesce |= DISPLAY_HANDOVER_LINES_OFF;
+  }
+  return Quiesce;
 }
 
 // Names the statuses the steps meet. Others print as "error N" in Buffer.

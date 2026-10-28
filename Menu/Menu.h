@@ -82,8 +82,8 @@ MenuVarIs (
   IN UINT8        Value
 );
 
-// Returns TRUE if DeveloperOptions has Bit (SETTINGS_BOOT_LOG or
-// SETTINGS_SD_DIAGNOSTICS) set.
+// Returns TRUE if DeveloperOptions has Bit (a bit from Core/Settings.h)
+// set.
 BOOLEAN
 MenuDeveloperOptionsHas (IN UINT8 Bit);
 

@@ -498,13 +498,13 @@ ChipBoard (OUT USB_HOST_BOARD *Board)
 }
 
 // Returns TRUE if USB host can come up without a restart, with fastboot
-// paused. This is an experiment, turned on by UsbHostLive.
+// paused. This is an experiment, turned on by SETTINGS_USB_HOST_LIVE.
 STATIC BOOLEAN
 UsbLive (IN CONST MENU_STATE *M)
 {
   USB_HOST_BOARD Board;
 
-  return M->Caps.UsbHost && MenuVarIs (SETTINGS_KEY_USB_HOST_LIVE, 1) &&
+  return M->Caps.UsbHost && MenuDeveloperOptionsHas (SETTINGS_USB_HOST_LIVE) &&
          ChipBoard (&Board);
 }
 
@@ -1124,20 +1124,19 @@ STATIC DEVELOPER_OPTIONS
 ReadDeveloperOptions (VOID)
 {
   OABL_BUFFER Stored = {0};
-  UINT8       Quiesce =
-    MenuVarGet (SETTINGS_KEY_DISPLAY_QUIESCE, &Stored) && Stored.Len
+  UINT8       Bits   =
+    MenuVarGet (SETTINGS_KEY_DEVELOPER_OPTIONS, &Stored) && Stored.Len == 1
       ? Stored.Data[0]
       : 0;
 
   BufferFree (&Stored);
   return (DEVELOPER_OPTIONS){
-    .UsbLive       = MenuVarIs (SETTINGS_KEY_USB_HOST_LIVE, 1),
-    .Quiesce       = Quiesce & 1,
-    .PanelLinesOff = (Quiesce & 2) != 0,
-    .BootLog       = MenuDeveloperOptionsHas (SETTINGS_BOOT_LOG),
-    .SdDiagnostics = MenuDeveloperOptionsHas (SETTINGS_SD_DIAGNOSTICS),
-    .Unlocked =
-      MenuDeveloperOptionsHas (SETTINGS_DEVELOPER_OPTIONS_UNLOCKED),
+    .Unlocked      = (Bits & SETTINGS_DEVELOPER_OPTIONS_UNLOCKED) != 0,
+    .BootLog       = (Bits & SETTINGS_BOOT_LOG) != 0,
+    .SdDiagnostics = (Bits & SETTINGS_SD_DIAGNOSTICS) != 0,
+    .UsbLive       = (Bits & SETTINGS_USB_HOST_LIVE) != 0,
+    .Quiesce       = (Bits & SETTINGS_DISPLAY_QUIESCE) != 0,
+    .PanelLinesOff = (Bits & SETTINGS_PANEL_LINES_OFF) != 0,
   };
 }
 
@@ -1145,23 +1144,16 @@ ReadDeveloperOptions (VOID)
 STATIC EFI_STATUS
 SaveDeveloperOptions (IN DEVELOPER_OPTIONS Want)
 {
-  STATIC CONST UINT8 One     = 1;
-  UINT8              Quiesce = (UINT8)(Want.Quiesce | Want.PanelLinesOff << 1);
-  UINT8              Bits =
+  UINT8 Bits =
     (UINT8)((Want.Unlocked ? SETTINGS_DEVELOPER_OPTIONS_UNLOCKED : 0) |
             (Want.BootLog ? SETTINGS_BOOT_LOG : 0) |
-            (Want.SdDiagnostics ? SETTINGS_SD_DIAGNOSTICS : 0));
+            (Want.SdDiagnostics ? SETTINGS_SD_DIAGNOSTICS : 0) |
+            (Want.UsbLive ? SETTINGS_USB_HOST_LIVE : 0) |
+            (Want.Quiesce ? SETTINGS_DISPLAY_QUIESCE : 0) |
+            (Want.PanelLinesOff ? SETTINGS_PANEL_LINES_OFF : 0));
   EFI_STATUS Status =
-    MenuVarPut (SETTINGS_KEY_USB_HOST_LIVE, &One, Want.UsbLive ? 1 : 0);
+    MenuVarPut (SETTINGS_KEY_DEVELOPER_OPTIONS, &Bits, Bits ? 1 : 0);
 
-  if (EFI_ERROR (Status)) {
-    return Status;
-  }
-  Status = MenuVarPut (SETTINGS_KEY_DISPLAY_QUIESCE, &Quiesce, 1);
-  if (EFI_ERROR (Status)) {
-    return Status;
-  }
-  Status = MenuVarPut (SETTINGS_KEY_DEVELOPER_OPTIONS, &Bits, Bits ? 1 : 0);
   if (EFI_ERROR (Status)) {
     return Status;
   }

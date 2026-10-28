@@ -90,16 +90,9 @@ extern CONST UINT8 gSettingsTimeoutChoices[4];
 // Set by the menu before restarting into fastboot: why nothing could boot
 // (MENU_START_RESULT_*). Deleted once read.
 #define SETTINGS_KEY_BOOT_FAILURE "BootFailure"
-// DISPLAY_HANDOVER_* bits from Core/Panel.h. Absent means 0.
-#define SETTINGS_KEY_DISPLAY_QUIESCE "DisplayQuiesce"
-#define SETTINGS_KEY_CUSTOM_LOGO     "CustomLogo"
-#define SETTINGS_KEY_LANGUAGE        "MenuLanguage"
-// Experimental, set from the menu's developer options: 1 starts USB host in
-// the same boot as fastboot instead of restarting. On the glink SoCs XBL
-// died when a drive was attached after the gadget had run.
-#define SETTINGS_KEY_USB_HOST_LIVE "UsbHostLive"
-// SETTINGS_DEVELOPER_OPTIONS_UNLOCKED, SETTINGS_BOOT_LOG and
-// SETTINGS_SD_DIAGNOSTICS bits, set from the menu. Absent means 0.
+#define SETTINGS_KEY_CUSTOM_LOGO "CustomLogo"
+#define SETTINGS_KEY_LANGUAGE    "MenuLanguage"
+// The bits below, set from the menu's developer options. Absent means 0.
 #define SETTINGS_KEY_DEVELOPER_OPTIONS "DeveloperOptions"
 // The menu shows its Developer options item. Set by pressing the bootloader
 // version in Device info seven times.
@@ -109,6 +102,17 @@ extern CONST UINT8 gSettingsTimeoutChoices[4];
 #define SETTINGS_BOOT_LOG 2
 // The SD slot's state is logged before and after the SdccDxe patches.
 #define SETTINGS_SD_DIAGNOSTICS 4
+// Experimental: starts USB host in the same boot as fastboot instead of
+// restarting. On the glink SoCs XBL died when a drive was attached after
+// the gadget had run.
+#define SETTINGS_USB_HOST_LIVE 8
+// The display is turned off through XBL's display power protocol at
+// ExitBootServices, even when the devicetree keeps the splash
+// (DISPLAY_HANDOVER_QUIESCE).
+#define SETTINGS_DISPLAY_QUIESCE 16
+// The panel lines are turned off too, the backlight before the display and
+// the supplies after it (DISPLAY_HANDOVER_LINES_OFF).
+#define SETTINGS_PANEL_LINES_OFF 32
 
 VOID
 SettingsDefault (OUT SETTINGS *Settings);

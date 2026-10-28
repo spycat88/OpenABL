@@ -17,7 +17,8 @@
 
 #include <Protocol/OpenAblMenuHost.h>
 
-// Returns the DisplayQuiesce byte, or 0 if it isn't set.
+// Returns the DISPLAY_HANDOVER_* bits the developer options ask for
+// (SETTINGS_DISPLAY_QUIESCE, SETTINGS_PANEL_LINES_OFF), 0 if none.
 UINT8
 DisplayHandoverQuiesceSetting (VOID);
 
@@ -37,7 +38,7 @@ VOID
 DisplayHandoverSuppliesOff (IN OPENABL_STORAGE_LOG Log OPTIONAL);
 
 // The hand-over, run at ExitBootServices. KeepAlive leaves the display on,
-// unless DisplayQuiesce forces it off.
+// unless the developer options force it off.
 VOID
 DisplayHandoverBeforeExit (
   IN BOOLEAN             KeepAlive,
