@@ -77,6 +77,8 @@ STATIC CONST LANG_STRINGS mEn = {
   .DeveloperOptionsPanelLines    = "Panel lines off",
   .DeveloperOptionsBootLog       = "Boot log on screen",
   .DeveloperOptionsSdDiagnostics = "SD card diagnostics",
+  .DeveloperOptionsReset         = "Reset OpenABL settings",
+  .DeveloperOptionsResetFailed   = "The settings couldn't be reset",
   .DeveloperOptionsStepsAway     =
     "You are now {} steps away from unlocking Developer options",
   .DeveloperOptionsStepAway      =
@@ -236,6 +238,8 @@ STATIC CONST LANG_STRINGS mZhHans = {
   .DeveloperOptionsPanelLines    = "关闭面板背光与供电",
   .DeveloperOptionsBootLog       = "屏幕显示启动日志",
   .DeveloperOptionsSdDiagnostics = "SD 卡诊断",
+  .DeveloperOptionsReset         = "重置 OpenABL 设置",
+  .DeveloperOptionsResetFailed   = "设置未能重置",
   .DeveloperOptionsStepsAway     = "再按 {} 次即可解锁开发者选项",
   .DeveloperOptionsStepAway      = "再按 1 次即可解锁开发者选项",
   .DeveloperOptionsUnlocked      = "开发者选项已解锁！",

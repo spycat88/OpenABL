@@ -67,6 +67,13 @@ VariablesPut (
 EFI_STATUS
 VariablesFlush (VOID);
 
+// Replaces the settings with an empty store, the device model too, and
+// writes it, so the next boot starts from the defaults. Nothing is carried
+// over from an older loader then, as misc now holds a store of this
+// version. EFI_NOT_FOUND if misc couldn't be read, else the write's error.
+EFI_STATUS
+VariablesReset (IN LOG_SINK Log);
+
 // Once, when misc held no store of this version: carries the device model
 // over from another version's store, else from an older loader
 // (MigrateModel), and writes the new store. Run early at each boot.

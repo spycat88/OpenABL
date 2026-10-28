@@ -784,6 +784,7 @@ AppItemView (
   case ITEM_PANEL_LINES:
   case ITEM_BOOT_LOG:
   case ITEM_SD_DIAGNOSTICS:
+  case ITEM_RESET_SETTINGS:
   case ITEM_DEVELOPER_OPTIONS_BACK:
     DeveloperOptionsItemView (A, Item, View);
     break;
@@ -875,6 +876,7 @@ Activate (
   case ITEM_PANEL_LINES:
   case ITEM_BOOT_LOG:
   case ITEM_SD_DIAGNOSTICS:
+  case ITEM_RESET_SETTINGS:
   case ITEM_DEVELOPER_OPTIONS_BACK:
     return DeveloperOptionsActivate (A, Item);
   case ITEM_POWER_OFF:

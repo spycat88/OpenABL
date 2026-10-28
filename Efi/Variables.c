@@ -294,6 +294,25 @@ VariablesFlush (VOID)
   return EFI_SUCCESS;
 }
 
+EFI_STATUS
+VariablesReset (IN LOG_SINK Log)
+{
+  EFI_STATUS Status;
+
+  VariablesLoad (Log);
+  SettingsStoreFormat (mStore.Store);
+  mStore.Ready = TRUE;
+  mStore.Dirty = TRUE;
+  Status       = VariablesFlush ();
+  if (Status != EFI_SUCCESS) {
+    LogPrint (mLog, "settings reset: %s", STATUS_TEXT (Status));
+    return Status;
+  }
+  mStore.Fresh = FALSE;
+  LogLine (mLog, "settings reset: misc holds an empty store");
+  return EFI_SUCCESS;
+}
+
 VOID
 VariablesSetUp (IN LOG_SINK Log)
 {

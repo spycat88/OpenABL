@@ -1364,6 +1364,16 @@ RunCommand (
     }
     break;
   }
+  case COMMAND_RESET_SETTINGS:
+    // Every setting back to its default, from the restart on.
+    if (VariablesReset (gMenuEfiLog) != EFI_SUCCESS) {
+      AppOnFailed (&mApp, gStrings->DeveloperOptionsResetFailed);
+      break;
+    }
+    if (Act (M, OPENABL_MENU_ACTION_RESTART_BOOTLOADER) != EFI_SUCCESS) {
+      AppOnFailed (&mApp, gStrings->AblActionFailed);
+    }
+    break;
   case COMMAND_LOG: {
     OABL_BUFFER Raw   = {0};
     CHAR8     **Lines = AllocateZeroArray (LOG_LINES, sizeof (*Lines));
