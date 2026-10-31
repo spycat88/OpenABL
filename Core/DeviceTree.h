@@ -139,6 +139,54 @@ DtNodeChildren (
   OUT DT_NODES   *Out
 );
 
+// Finds the next node after After, in tree order, whose compatible list
+// holds Compatible. Pass DT_START for the first.
+BOOLEAN
+DtNextCompatible (
+  IN CONST UINT8 *Fdt,
+  IN UINTN        Size,
+  IN CONST CHAR8 *Compatible,
+  IN UINTN        After,
+  OUT UINTN      *Node
+);
+
+#define DT_START MAX_UINTN
+
+// TRUE if Node's compatible list holds Compatible.
+BOOLEAN
+DtIsCompatible (
+  IN CONST UINT8 *Fdt,
+  IN UINTN        Size,
+  IN UINTN        Node,
+  IN CONST CHAR8 *Compatible
+);
+
+// TRUE if Node has no status, or "okay" or "ok".
+BOOLEAN
+DtIsEnabled (
+  IN CONST UINT8 *Fdt,
+  IN UINTN        Size,
+  IN UINTN        Node
+);
+
+// Finds Node's parent. FALSE for the root.
+BOOLEAN
+DtParent (
+  IN CONST UINT8 *Fdt,
+  IN UINTN        Size,
+  IN UINTN        Node,
+  OUT UINTN      *Parent
+);
+
+// Finds the node whose phandle (or linux,phandle) is Phandle.
+BOOLEAN
+DtNodeByPhandle (
+  IN CONST UINT8 *Fdt,
+  IN UINTN        Size,
+  IN UINT32       Phandle,
+  OUT UINTN      *Node
+);
+
 // Adds a no-map Prefix@BASE node to /reserved-memory, creating it if
 // needed, unless a region there already covers the range. This keeps the
 // kernel off the scanned-out memory when it takes its memory layout from the

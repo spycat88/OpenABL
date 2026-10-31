@@ -13,12 +13,14 @@
 #include "Base/Buffer.h"
 #include "Base/Print.h"
 #include "Base/Text.h"
+#include "Core/RsInput.h"
 #include "Core/SysInfoText.h"
 #include "Core/UsbHostRegs.h"
 #include "Efi/Abl.h"
 #include "Efi/Efi.h"
 #include "Efi/DefaultFiles.h"
 #include "Efi/Display.h"
+#include "Efi/Gamepad.h"
 #include "Efi/Input.h"
 #include "Efi/Models.h"
 #include "Efi/Qcom.h"
@@ -400,6 +402,113 @@ Refresh (IN OUT MENU_STATE *M)
   return EFI_SUCCESS;
 }
 
+// The gamepad
+
+// Reads the cached gamepad of Model. FALSE when the cache is for another
+// model, or from a build with another layout; *Has is FALSE when Model has
+// no gamepad the menu can run.
+STATIC BOOLEAN
+GamepadCached (
+  IN CONST CHAR8     *Model,
+  OUT BOOLEAN        *Has,
+  OUT RSINPUT_CONFIG *Config
+)
+{
+  OABL_BUFFER Stored = {0};
+  UINTN       Length = AsciiStrLen (Model);
+  BOOLEAN     Same;
+
+  *Has = FALSE;
+  Same = MenuVarGet (SETTINGS_KEY_MODEL_GAMEPAD, &Stored) &&
+         Stored.Len >= 1 + Length && Stored.Data[0] == Length &&
+         CompareMem (Stored.Data + 1, Model, Length) == 0;
+  if (Same && Stored.Len > 1 + Length) {
+    *Has = RsInputConfigDecode (
+      Stored.Data + 1 + Length, Stored.Len - 1 - Length, Config
+    );
+    Same = *Has;
+  }
+  BufferFree (&Stored);
+  return Same;
+}
+
+STATIC VOID
+GamepadRemember (
+  IN CONST CHAR8          *Model,
+  IN CONST RSINPUT_CONFIG *Config OPTIONAL
+)
+{
+  UINT8 Bytes[1 + MODEL_LEN + RSINPUT_CONFIG_BYTES];
+  UINTN Length = AsciiStrLen (Model);
+
+  Bytes[0] = (UINT8)Length;
+  CopyMem (Bytes + 1, Model, Length);
+  if (Config) {
+    RsInputConfigEncode (Config, Bytes + 1 + Length);
+  }
+  VarSet (
+    SETTINGS_KEY_MODEL_GAMEPAD, Bytes,
+    1 + Length + (Config ? RSINPUT_CONFIG_BYTES : 0)
+  );
+  MenuFlush ();
+}
+
+// Reads the selected model's devicetree from the allowed drives and caches
+// its gamepad, or that it has none. A model whose devicetree isn't found
+// counts as having none until it is picked again. FALSE if the devicetree
+// can't be read now (the USB boot source, while fastboot has the
+// controller).
+STATIC BOOLEAN
+LearnGamepad (IN MENU_STATE *M)
+{
+  VOLUMES_HANDLE_LIST Drives = {0};
+  OABL_BUFFER         Dtb    = {0};
+  RSINPUT_CONFIG      Config;
+  RSINPUT_DT_RESULT   Result = RSINPUT_DT_NONE;
+  BOOLEAN             Found  = FALSE;
+
+  if (M->Stored.BootSource == BOOT_SOURCE_USB && !M->StartModels) {
+    MenuLog ("gamepad: the devicetree is on USB, not read now");
+    return FALSE;
+  }
+  QuirksPrepareStorage (QuirksChipId (), gMenuEfiLog);
+  VolumesAllowed (M->Stored.BootSource, M->Caps.CfwOnInternal, FALSE, &Drives);
+  for (UINTN Index = 0; Index < Drives.Count && !Found; Index++) {
+    Found = ModelsDevicetreeFor (Drives.Items[Index], M->Stored.Model, &Dtb);
+  }
+  VecFree (&Drives);
+  if (Found) {
+    Result = RsInputFromDt (Dtb.Data, Dtb.Len, &Config);
+    BufferFree (&Dtb);
+    MenuLog ("gamepad: %s: %s", M->Stored.Model, RsInputDtResultName (Result));
+  } else {
+    MenuLog ("gamepad: no devicetree found for %s", M->Stored.Model);
+  }
+  GamepadRemember (M->Stored.Model, Result == RSINPUT_DT_OK ? &Config : NULL);
+  return TRUE;
+}
+
+// Starts the selected model's gamepad, if it has one, reading its
+// devicetree first when the cache is for another model.
+STATIC VOID
+StartGamepad (IN MENU_STATE *M)
+{
+  RSINPUT_CONFIG Config;
+  BOOLEAN        Has;
+
+  GamepadStop ();
+  if (!M->Stored.Model[0]) {
+    return;
+  }
+  if (!GamepadCached (M->Stored.Model, &Has, &Config) &&
+      !(LearnGamepad (M) && GamepadCached (M->Stored.Model, &Has, &Config))) {
+    return;
+  }
+  if (Has) {
+    GamepadStart (&Config, ClockNowMs (), gMenuEfiLog);
+  }
+}
+
 // Stores the changed settings and the display preferences, then checks
 // what the variables actually hold. Returns an error message, or NULL.
 STATIC CONST CHAR8 *
@@ -409,8 +518,9 @@ Save (
 )
 {
   SETTINGS_VAR Changes[SETTINGS_VARS];
-  UINTN        Count = SettingsChangedVars (&M->Stored, Want, Changes);
-  UINTN        Kept  = 0;
+  UINTN        Count    = SettingsChangedVars (&M->Stored, Want, Changes);
+  UINTN        Kept     = 0;
+  BOOLEAN      NewModel = !AsciiStrEq (M->Stored.Model, Want->Model);
   CHAR8        Text[MODEL_LEN + 8];
 
   for (UINTN Index = 0; Index < Count; Index++) {
@@ -464,6 +574,9 @@ Save (
   M->Stored.ModelRotation = Want->ModelRotation;
   M->Stored.Language      = Want->Language;
   MenuSavePrefs (Want);
+  if (NewModel) {
+    StartGamepad (M);
+  }
   if (EFI_ERROR (Refresh (M))) {
     return gStrings->AblNotAnswering;
   }
@@ -507,10 +620,17 @@ Act (
 )
 {
   EFI_STATUS Status;
+  BOOLEAN    Pad;
 
+  // The action may restart or boot, so the gamepad's pins and clocks are
+  // put back first.
+  Pad = GamepadStop ();
   MenuLog ("action %s", MenuHostActionName (Action));
   Status = MenuHostAction (&M->Host, Action);
   MenuLog ("%s -> %s", MenuHostActionName (Action), MENU_STATUS (Status));
+  if (Pad) {
+    GamepadResume (ClockNowMs ());
+  }
   return Status;
 }
 
@@ -1488,6 +1608,14 @@ RunMenu (
   if (!StartModels) {
     LearnModelRotation (&M);
   }
+  // Read before the screen is up, like the rotation; started below.
+  {
+    RSINPUT_CONFIG Pad;
+    BOOLEAN        Has;
+    if (M.Stored.Model[0] && !GamepadCached (M.Stored.Model, &Has, &Pad)) {
+      LearnGamepad (&M);
+    }
+  }
   Status = DisplayOpen (&mDisplay);
   if (EFI_ERROR (Status)) {
     MenuHostLog (&M.Host, "openabl-menu: no graphics output");
@@ -1564,6 +1692,7 @@ RunMenu (
   gST->ConOut->EnableCursor (gST->ConOut, FALSE);
   // Ignore a key still held from opening the menu.
   InputKeysHeldAtStart (&Keys, ClockNowMs ());
+  StartGamepad (&M);
   ViewRotate (Rotation);
   mApp.Dirty = TRUE;
 
@@ -1574,6 +1703,7 @@ RunMenu (
     UINT16       Want;
 
     InputKeysPoll (&Keys, Now, &Events);
+    GamepadPoll (Now, &Events);
     // Once an uninstall waits to restart into recovery, keys and timers do
     // nothing, so its settings can't be changed back before the wipe.
     for (UINTN Index = 0; Index < Events.Count && !M.RestartAt; Index++) {
@@ -1608,6 +1738,7 @@ RunMenu (
     if (Pending.Count) {
       ViewSettle ();
       if (RunCommand (&M, NextPending (&Pending))) {
+        GamepadStop ();
         ViewDone ();
         return (MENU_END){
           M.OpenMenu ? MENU_END_OPEN_MENU : MENU_END_START_HERE, EFI_ABORTED
@@ -1615,6 +1746,7 @@ RunMenu (
       }
       // The key that started a slow command can still be reported.
       InputKeysAfterBusy (&Keys, ClockNowMs ());
+      GamepadAfterBusy (ClockNowMs ());
       continue;
     }
     // Give idle time to fastboot. The ABL serves one USB event per poll,
@@ -1624,6 +1756,7 @@ RunMenu (
       Status = MenuHostPoll (&M.Host);
       if (Status != EFI_SUCCESS) {
         MenuLog ("the ABL asked to leave (%s)", MENU_STATUS (Status));
+        GamepadStop ();
         ViewDone ();
         return (MENU_END){MENU_END_LEFT, Status};
       }

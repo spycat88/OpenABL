@@ -40,6 +40,10 @@ At power-on:
 | Volume Up | Boots Android when the boot mode is Linux, or Android recovery when it is Android. With *Volume up at boot* set to *Linux (external)*, boots Linux from the SD card or a USB drive instead. |
 
 In the menu, Volume Up and Down move the selection and Power selects.
+When the *Device model*'s devicetree has an RSInput gamepad (Retroid Pocket
+on SM8550), its D-pad and left stick also move the selection, A (bottom) and
+Start select, and B (right) goes back. Its UART, pins and clocks are read
+from that devicetree when the model is picked.
 
 | Item | What it does |
 |---|---|

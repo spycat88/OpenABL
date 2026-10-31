@@ -87,6 +87,10 @@ extern CONST UINT8 gSettingsTimeoutChoices[4];
 #define SETTINGS_KEY_MODEL_ROTATION   "DeviceModelRotation"
 // Set by the menu: the model that DeviceModelRotation belongs to.
 #define SETTINGS_KEY_MODEL_ROTATION_FOR "DeviceModelRotationFor"
+// Set by the menu: the model's RSInput gamepad, read from its devicetree.
+// A length byte, the model it belongs to, then RsInputConfigEncode's bytes,
+// or nothing when the devicetree has no gamepad the menu can run.
+#define SETTINGS_KEY_MODEL_GAMEPAD "DeviceModelGamepad"
 // Set by the menu to open the model list once, at the next boot.
 #define SETTINGS_KEY_SHOW_MODEL_MENU "ShowModelMenu"
 // Set by the menu before restarting into fastboot: why nothing could boot
