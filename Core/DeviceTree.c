@@ -536,6 +536,142 @@ DtNodeChildren (
   return TRUE;
 }
 
+// TRUE if the string list Property holds String.
+STATIC BOOLEAN
+ListHas (
+  IN OABL_BYTES   Property,
+  IN CONST CHAR8 *String
+)
+{
+  OABL_BYTES Item;
+
+  for (UINTN At = 0; Cstr (Property.Ptr, Property.Len, At, &Item);
+       At += Item.Len + 1) {
+    if (BytesIs (Item, String)) {
+      return TRUE;
+    }
+  }
+  return FALSE;
+}
+
+BOOLEAN
+DtNextCompatible (
+  IN CONST UINT8 *Fdt,
+  IN UINTN        Size,
+  IN CONST CHAR8 *Compatible,
+  IN UINTN        After,
+  OUT UINTN      *Node
+)
+{
+  INT32 Offset;
+
+  if (!Usable (Fdt, Size, NO_NODE) || (After != DT_START && After > INT_MAX)) {
+    return FALSE;
+  }
+  Offset = fdt_node_offset_by_compatible (
+    Fdt, After == DT_START ? -1 : (INT32)After, Compatible
+  );
+  if (Offset < 0) {
+    return FALSE;
+  }
+  *Node = (UINTN)Offset;
+  return TRUE;
+}
+
+BOOLEAN
+DtIsCompatible (
+  IN CONST UINT8 *Fdt,
+  IN UINTN        Size,
+  IN UINTN        Node,
+  IN CONST CHAR8 *Compatible
+)
+{
+  OABL_BYTES Property;
+
+  return Usable (Fdt, Size, Node) && Get (Fdt, Node, "compatible", &Property) &&
+         ListHas (Property, Compatible);
+}
+
+BOOLEAN
+DtIsEnabled (
+  IN CONST UINT8 *Fdt,
+  IN UINTN        Size,
+  IN UINTN        Node
+)
+{
+  OABL_BYTES Status;
+  OABL_BYTES Value;
+
+  if (!Usable (Fdt, Size, Node)) {
+    return FALSE;
+  }
+  if (!Get (Fdt, Node, "status", &Status)) {
+    return TRUE;
+  }
+  return Cstr (Status.Ptr, Status.Len, 0, &Value) &&
+         (BytesIs (Value, "okay") || BytesIs (Value, "ok"));
+}
+
+// Deepest nesting DtParent follows.
+#define PARENT_DEPTH_MAX 64
+
+BOOLEAN
+DtParent (
+  IN CONST UINT8 *Fdt,
+  IN UINTN        Size,
+  IN UINTN        Node,
+  OUT UINTN      *Parent
+)
+{
+  INT32 Path[PARENT_DEPTH_MAX];
+  INT32 Depth = 0;
+
+  if (!Usable (Fdt, Size, Node)) {
+    return FALSE;
+  }
+  // fdt_next_node gives each node's depth below the root (0).
+  for (INT32 Offset = 0; Offset >= 0 && Depth >= 0;
+       Offset       = fdt_next_node (Fdt, Offset, &Depth)) {
+    if (Depth >= PARENT_DEPTH_MAX) {
+      continue;
+    }
+    Path[Depth] = Offset;
+    if ((UINTN)Offset == Node) {
+      if (Depth == 0) {
+        return FALSE;
+      }
+      *Parent = (UINTN)Path[Depth - 1];
+      return TRUE;
+    }
+  }
+  return FALSE;
+}
+
+BOOLEAN
+DtNodeByPhandle (
+  IN CONST UINT8 *Fdt,
+  IN UINTN        Size,
+  IN UINT32       Phandle,
+  OUT UINTN      *Node
+)
+{
+  OABL_BYTES Value;
+
+  if (Phandle == 0 || Phandle == 0xffffffffu || !Usable (Fdt, Size, NO_NODE)) {
+    return FALSE;
+  }
+  for (INT32 Offset = 0; Offset >= 0;
+       Offset       = fdt_next_node (Fdt, Offset, NULL)) {
+    if ((Get (Fdt, (UINTN)Offset, "phandle", &Value) ||
+         Get (Fdt, (UINTN)Offset, "linux,phandle", &Value)) &&
+        Value.Len == 4 && ReadBe32 (Value.Ptr) == Phandle) {
+      *Node = (UINTN)Offset;
+      return TRUE;
+    }
+  }
+  return FALSE;
+}
+
 STATIC CHAR8 *
 UnitName (
   IN CONST CHAR8 *Prefix,
