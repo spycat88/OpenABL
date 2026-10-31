@@ -11,8 +11,9 @@
   streams its state over a QUP serial engine at 115200 8N1. Linux binds it
   under a "qcom,geni-uart" with one of two drivers: RSInput, for
   "retroidpocket,rsinput", "ayntec,rsinput" or "gamepad,rsinput" nodes,
-  and the older Retroid Pocket gamepad driver, for
-  "retroid,retroid-pocket-gamepad". They speak the same protocol but
+  and the older Retroid Pocket and Odin 2 gamepad drivers, for
+  "retroid,retroid-pocket-gamepad" and "ayn,odin2-gamepad", which start it
+  the same way. They speak the same protocol but
   start the MCU with different commands and waits. This is a fresh
   implementation of that wire protocol, the bring-up of its UART and lines,
   and the reading of all of it from the device model's devicetree.

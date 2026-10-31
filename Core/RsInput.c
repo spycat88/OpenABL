@@ -970,6 +970,7 @@ STATIC CONST struct {
   {"ayntec,rsinput", RSINPUT_DRIVER_RSINPUT},
   {"gamepad,rsinput", RSINPUT_DRIVER_RSINPUT},
   {"retroid,retroid-pocket-gamepad", RSINPUT_DRIVER_RETROID},
+  {"ayn,odin2-gamepad", RSINPUT_DRIVER_RETROID},
 };
 
 RSINPUT_DT_RESULT
