@@ -8,8 +8,8 @@
 
   GamepadStart checks the chip, sets the pins, turns the clocks on and
   checks the serial engine has UART firmware; the rest of the power-up
-  follows Linux's timing (20 ms, then 50 ms, then the two commands 50 ms
-  apart) in GamepadPoll, so the menu doesn't wait for it. The D-pad and the
+  follows the Linux driver's waits and commands (RsInputInit) in
+  GamepadPoll, so the menu doesn't wait for it. The D-pad and the
   left stick move the selection, A (south) and Start select, B (east) and
   Back go back. Everything the bring-up changed is put back by GamepadStop,
   which must run before anything else boots. Log lines start with

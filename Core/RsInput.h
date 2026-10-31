@@ -9,10 +9,13 @@
 
   Some handhelds (Retroid Pocket, AYN) wire their buttons to an MCU that
   streams its state over a QUP serial engine at 115200 8N1. Linux binds it
-  as a "retroidpocket,rsinput", "ayntec,rsinput" or "gamepad,rsinput" node
-  under a "qcom,geni-uart". This is a fresh implementation of that wire
-  protocol, the bring-up of its UART and lines, and the reading of all of
-  it from the device model's devicetree.
+  under a "qcom,geni-uart" with one of two drivers: RSInput, for
+  "retroidpocket,rsinput", "ayntec,rsinput" or "gamepad,rsinput" nodes,
+  and the older Retroid Pocket gamepad driver, for
+  "retroid,retroid-pocket-gamepad". They speak the same protocol but
+  start the MCU with different commands and waits. This is a fresh
+  implementation of that wire protocol, the bring-up of its UART and lines,
+  and the reading of all of it from the device model's devicetree.
 
   A frame is A5 D3 5A 3D, a sequence number, a command, a little-endian
   payload length, the payload and an XOR of everything from the sequence
@@ -21,8 +24,9 @@
   frames (02): two bytes of buttons, the two triggers and the four stick
   axes, 16 bits each.
 
-  What the devicetree can't say, the TLMM function numbers of the UART pins
-  and the GCC registers behind each clock id, comes from a table per SoC.
+  What the devicetree can't say, the TLMM function numbers of the UART pins,
+  which TLMM tile holds each pin and the GCC registers behind each clock id,
+  comes from a table per SoC.
   Register sequences go through an MMIO so host tests can check them; their
   waits are bounded polls.
 */
@@ -79,14 +83,30 @@ RsInputFrame (
   OUT UINT8       Out[RSINPUT_FRAME_MAX]
 );
 
-// The two commands the host sends after power-up, in order.
-UINTN
-RsInputInitPayload (
-  IN UINTN          Index,
-  OUT CONST UINT8 **Payload
-);
+// The driver whose start-up a node asks for.
+typedef enum {
+  RSINPUT_DRIVER_RSINPUT,
+  RSINPUT_DRIVER_RETROID,
+  RSINPUT_DRIVER_COUNT,
+} RSINPUT_DRIVER;
 
-#define RSINPUT_INIT_COMMANDS 2
+#define RSINPUT_INIT_MAX 6
+
+// How a driver starts the MCU: the waits after the supply and after the
+// enable, then the commands it sends, that far apart.
+typedef struct _RSINPUT_INIT {
+  UINT16 PowerMs;
+  UINT16 ReleaseMs;
+  UINT16 CommandMs;
+  UINT8  Count;
+  struct {
+    CONST UINT8 *Payload;
+    UINT8        Length;
+  } Commands[RSINPUT_INIT_MAX];
+} RSINPUT_INIT;
+
+CONST RSINPUT_INIT *
+RsInputInit (IN UINT8 Driver);
 
 // What the MCU last reported.
 typedef struct _RSINPUT_REPORT {
@@ -122,6 +142,7 @@ RsInputRxFeed (
 // The SoCs with a table.
 typedef enum {
   RSINPUT_SOC_SM8550,
+  RSINPUT_SOC_SM8250,
   RSINPUT_SOC_COUNT,
 } RSINPUT_SOC;
 
@@ -150,16 +171,19 @@ typedef struct _RSINPUT_LINE {
 #define RSINPUT_PINS_MAX      8
 #define RSINPUT_CLOCKS_MAX    8
 #define RSINPUT_ALWAYS_ON_MAX 4
+#define RSINPUT_TILES_MAX     3
 
 // Everything the bring-up needs, read from the devicetree. It is cached in
 // a setting as raw bytes after RSINPUT_CONFIG_VERSION, so bump that when
 // the layout changes.
 typedef struct _RSINPUT_CONFIG {
   UINT8 Soc;
-  // The serial engine, its QUP wrapper, the TLMM and the GCC.
+  UINT8 Driver;
+  // The serial engine, its QUP wrapper, the TLMM's tiles in the SoC table's
+  // order and the GCC.
   UINT64 Uart;
   UINT64 Wrapper;
-  UINT64 Tlmm;
+  UINT64 Tlmm[RSINPUT_TILES_MAX];
   UINT64 Gcc;
   // The UART's pins, then the gamepad node's own pinctrl.
   UINT8       PinCount;
@@ -183,7 +207,7 @@ typedef struct _RSINPUT_CONFIG {
   UINT32  AxisRange;
 } RSINPUT_CONFIG;
 
-#define RSINPUT_CONFIG_VERSION 3
+#define RSINPUT_CONFIG_VERSION 4
 #define RSINPUT_CONFIG_BYTES   (1 + sizeof (RSINPUT_CONFIG))
 
 // Writes Config as RSINPUT_CONFIG_VERSION then its bytes.
@@ -193,8 +217,8 @@ RsInputConfigEncode (
   OUT UINT8                Out[RSINPUT_CONFIG_BYTES]
 );
 
-// Reads what RsInputConfigEncode wrote. FALSE for another version, size or
-// SoC.
+// Reads what RsInputConfigEncode wrote. FALSE for another version, size,
+// SoC or driver.
 BOOLEAN
 RsInputConfigDecode (
   IN CONST UINT8     *Bytes,

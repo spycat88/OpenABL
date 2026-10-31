@@ -12,11 +12,6 @@
 #include "Base/Buffer.h"
 #include "Efi/Qcom.h"
 
-// Linux's waits: after the supply, after the enable, and before each
-// command.
-#define POWER_MS   20
-#define RELEASE_MS 50
-#define COMMAND_MS 50
 // When no report has come by then, say so once.
 #define SILENT_MS 2000
 
@@ -34,8 +29,9 @@ typedef enum {
 typedef struct _PAD {
   PAD_STAGE      Stage;
   BOOLEAN        Known;
-  RSINPUT_CONFIG Config;
-  RSINPUT_SAVED  Saved;
+  RSINPUT_CONFIG      Config;
+  CONST RSINPUT_INIT *Init;
+  RSINPUT_SAVED       Saved;
   LOG_SINK       Log;
   // When the next stage is due, ms.
   UINT64 Due;
@@ -60,12 +56,12 @@ STATIC PAD mPad;
 STATIC VOID
 SendInit (IN UINTN Index)
 {
-  CONST UINT8 *Payload;
-  UINTN        Length = RsInputInitPayload (Index, &Payload);
-  UINT8        Frame[RSINPUT_FRAME_MAX];
+  UINT8 Frame[RSINPUT_FRAME_MAX];
+  UINTN Length = RsInputFrame (
+    mPad.Sequence++, RSINPUT_CMD_COMMOD, mPad.Init->Commands[Index].Payload,
+    mPad.Init->Commands[Index].Length, Frame
+  );
 
-  Length =
-    RsInputFrame (mPad.Sequence++, RSINPUT_CMD_COMMOD, Payload, Length, Frame);
   if (!RsInputUartWrite (&gMmioHardware, &mPad.Config, Frame, Length)) {
     LogPrint (mPad.Log, "gamepad: command %llu wasn't sent", (UINT64)Index);
   }
@@ -82,7 +78,8 @@ GamepadStart (
   UINT32    Protocol;
 
   GamepadStop ();
-  mPad = (PAD){.Config = *Config, .Log = Log};
+  mPad =
+    (PAD){.Config = *Config, .Init = RsInputInit (Config->Driver), .Log = Log};
   if (!QcomChip (&Chip) ||
       !RsInputSocIsChip (
         Config->Soc, EFI_ERROR (Chip.Id.Status) ? 0 : Chip.Id.Value, Chip.Name
@@ -107,7 +104,7 @@ GamepadStart (
     GamepadStop ();
     return FALSE;
   }
-  mPad.Due     = Now + POWER_MS;
+  mPad.Due     = Now + mPad.Init->PowerMs;
   mPad.Started = Now;
   mPad.Known   = TRUE;
   LogPrint (
@@ -207,7 +204,7 @@ GamepadPoll (
     }
     RsInputRelease (&gMmioHardware, &mPad.Config);
     mPad.Stage = PAD_RELEASED;
-    mPad.Due   = Now + RELEASE_MS;
+    mPad.Due   = Now + mPad.Init->ReleaseMs;
     return;
   case PAD_RELEASED:
     if (Now < mPad.Due) {
@@ -215,13 +212,13 @@ GamepadPoll (
     }
     RsInputUartSetup (&gMmioHardware, &mPad.Config);
     mPad.Stage = PAD_INIT;
-    mPad.Due   = Now + COMMAND_MS;
+    mPad.Due   = Now + mPad.Init->CommandMs;
     return;
   case PAD_INIT:
     if (Now >= mPad.Due) {
       SendInit (mPad.Sent++);
-      mPad.Due = Now + COMMAND_MS;
-      if (mPad.Sent == RSINPUT_INIT_COMMANDS) {
+      mPad.Due = Now + mPad.Init->CommandMs;
+      if (mPad.Sent == mPad.Init->Count) {
         mPad.Stage = PAD_RUNNING;
       }
     }

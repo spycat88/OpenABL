@@ -67,24 +67,35 @@ RsInputFrame (
   return Total;
 }
 
-// The version request, then the report parameters Linux sets.
+// The version request, the report parameters both drivers set, and the
+// two other subcommands the Retroid driver sends, whose meaning it doesn't
+// say.
 STATIC CONST UINT8 mVersionRequest[] = {RSINPUT_COMMOD_VERSION};
 STATIC CONST UINT8 mSetParameters[]  = {
   RSINPUT_COMMOD_SET_PAR, 0x01, 0x00, 0x00, 0x00, 0x28, 0x00, 0x00, 0x00, 0x07,
 };
+STATIC CONST UINT8 mRetroid07[] = {0x07, 0x01};
+STATIC CONST UINT8 mRetroid06[] = {0x06};
 
-UINTN
-RsInputInitPayload (
-  IN UINTN          Index,
-  OUT CONST UINT8 **Payload
-)
+#define COMMAND(Bytes) {Bytes, sizeof (Bytes)}
+
+STATIC CONST RSINPUT_INIT mInits[RSINPUT_DRIVER_COUNT] = {
+  [RSINPUT_DRIVER_RSINPUT] =
+    {20, 50, 50, 2, {COMMAND (mVersionRequest), COMMAND (mSetParameters)}},
+  [RSINPUT_DRIVER_RETROID] = {100,
+                              100,
+                              100,
+                              6,
+                              {COMMAND (mRetroid07), COMMAND (mRetroid06),
+                               COMMAND (mVersionRequest),
+                               COMMAND (mSetParameters), COMMAND (mRetroid06),
+                               COMMAND (mVersionRequest)}},
+};
+
+CONST RSINPUT_INIT *
+RsInputInit (IN UINT8 Driver)
 {
-  if (Index == 0) {
-    *Payload = mVersionRequest;
-    return sizeof (mVersionRequest);
-  }
-  *Payload = mSetParameters;
-  return sizeof (mSetParameters);
+  return &mInits[Driver < RSINPUT_DRIVER_COUNT ? Driver : 0];
 }
 
 // Linux reports a stick as the negated raw value.
@@ -211,6 +222,7 @@ RsInputConfigDecode (
   }
   CopyMem (Config, Bytes + 1, sizeof (*Config));
   return Config->Soc < RSINPUT_SOC_COUNT &&
+         Config->Driver < RSINPUT_DRIVER_COUNT &&
          Config->PinCount <= RSINPUT_PINS_MAX &&
          Config->ClockCount <= RSINPUT_CLOCKS_MAX &&
          Config->AlwaysOnCount <= RSINPUT_ALWAYS_ON_MAX;
@@ -244,11 +256,23 @@ typedef struct _SOC_CLOCK {
   UINT16 Needs[2];
 } SOC_CLOCK;
 
+// Pins First to Last are in the TLMM tile Tile.
+typedef struct _SOC_TILE {
+  UINT16 First;
+  UINT16 Last;
+  UINT8  Tile;
+} SOC_TILE;
+
 typedef struct _SOC_TABLE {
   CONST CHAR8 *Tlmm;
   CONST CHAR8 *Gcc;
   // Bytes between pins' registers.
-  UINT32           TlmmStride;
+  UINT32 TlmmStride;
+  // The TLMM's reg-names, when it has several tiles, and the tile of each
+  // pin not in tile 0.
+  CONST CHAR8     *TileNames[RSINPUT_TILES_MAX];
+  CONST SOC_TILE  *Tiles;
+  UINTN            TileCount;
   CONST CHAR8     *ChipNames[2];
   UINT32           ChipIds[4];
   CONST SOC_FUNC  *Funcs;
@@ -284,18 +308,77 @@ STATIC CONST SOC_CLOCK mSm8550Clocks[] = {
   {130, 0x52010, 1, 0x233d0, 0, 0, {NO_CLOCK, NO_CLOCK}},
 };
 
+// SM8250: pinctrl-sm8250.c and gcc-sm8250.c. The Retroid Pocket's gamepad
+// is on QUP2 SE2 (uart16), function qup16 on pins 48 to 51, all mux 1.
+STATIC CONST SOC_FUNC mSm8250Funcs[] = {
+  {"qup16", 48, 1},
+  {"qup16", 49, 1},
+  {"qup16", 50, 1},
+  {"qup16", 51, 1},
+};
+
+#define SM8250_TILE_WEST  0
+#define SM8250_TILE_SOUTH 1
+#define SM8250_TILE_NORTH 2
+
+STATIC CONST SOC_TILE mSm8250Tiles[] = {
+  {0, 3, SM8250_TILE_SOUTH},     {4, 23, SM8250_TILE_NORTH},
+  {24, 27, SM8250_TILE_SOUTH},   {28, 31, SM8250_TILE_NORTH},
+  {32, 65, SM8250_TILE_SOUTH},   {66, 68, SM8250_TILE_NORTH},
+  {69, 76, SM8250_TILE_SOUTH},   {77, 84, SM8250_TILE_NORTH},
+  {85, 91, SM8250_TILE_SOUTH},   {92, 124, SM8250_TILE_NORTH},
+  {125, 132, SM8250_TILE_SOUTH},
+};
+
+#define SM8250_QUPV3_WRAP2_CORE_2X 117
+#define SM8250_QUPV3_WRAP2_CORE    118
+
+STATIC CONST SOC_CLOCK mSm8250Clocks[] = {
+  {SM8250_QUPV3_WRAP2_CORE_2X, 0x52010, 3, 0x23278, 0, 0, {NO_CLOCK, NO_CLOCK}},
+  {SM8250_QUPV3_WRAP2_CORE, 0x52010, 0, 0x23270, 0, 0, {NO_CLOCK, NO_CLOCK}},
+  // GCC_QUPV3_WRAP2_S2_CLK, from gcc_qupv3_wrap2_s2_clk_src.
+  {123,
+   0x52010,
+   6,
+   0x1e26c,
+   0x1e270,
+   6,
+   {SM8250_QUPV3_WRAP2_CORE_2X, SM8250_QUPV3_WRAP2_CORE}},
+  // GCC_QUPV3_WRAP_2_M_AHB_CLK and _S_AHB_CLK.
+  {135, 0x52010, 2, 0x1e004, 0, 0, {NO_CLOCK, NO_CLOCK}},
+  {136, 0x52010, 1, 0x1e008, 0, 0, {NO_CLOCK, NO_CLOCK}},
+};
+
 STATIC CONST SOC_TABLE mSocs[RSINPUT_SOC_COUNT] = {
   [RSINPUT_SOC_SM8550] =
     {
       "qcom,sm8550-tlmm",
       "qcom,sm8550-gcc",
       0x1000,
+      {NULL},
+      NULL,
+      0,
       {"SM8550", "QCS8550"},
       {519, 601, 603, 604},
       mSm8550Funcs,
       COUNT_OF (mSm8550Funcs),
       mSm8550Clocks,
       COUNT_OF (mSm8550Clocks),
+    },
+  [RSINPUT_SOC_SM8250] =
+    {
+      "qcom,sm8250-pinctrl",
+      "qcom,gcc-sm8250",
+      0x1000,
+      {"west", "south", "north"},
+      mSm8250Tiles,
+      COUNT_OF (mSm8250Tiles),
+      {"SM8250", "QRB5165"},
+      {356, 455},
+      mSm8250Funcs,
+      COUNT_OF (mSm8250Funcs),
+      mSm8250Clocks,
+      COUNT_OF (mSm8250Clocks),
     },
 };
 
@@ -413,8 +496,37 @@ Deref (
   return DtNodeByPhandle (R->Fdt, R->Size, ReadBe32 (Cell), Node);
 }
 
-// The first address in Node's reg, read with its parent's #address-cells.
-// Assumes identity ranges up the tree, as on these SoCs.
+// The address of entry Index of Node's reg, read with its parent's
+// #address-cells and #size-cells. Assumes identity ranges up the tree, as on
+// these SoCs.
+STATIC BOOLEAN
+RegAt (
+  IN CONST DT_READ *R,
+  IN UINTN          Node,
+  IN UINTN          Index,
+  OUT UINT64       *Base
+)
+{
+  UINTN      Parent;
+  UINT32     Cells     = 2;
+  UINT32     SizeCells = 1;
+  UINTN      At;
+  OABL_BYTES Reg;
+
+  if (!DtParent (R->Fdt, R->Size, Node, &Parent)) {
+    return FALSE;
+  }
+  PropU32 (R, Parent, "#address-cells", &Cells);
+  PropU32 (R, Parent, "#size-cells", &SizeCells);
+  At = Index * (Cells + SizeCells) * 4;
+  if ((Cells != 1 && Cells != 2) || SizeCells > 2 ||
+      !Prop (R, Node, "reg", &Reg) || Reg.Len < At + Cells * 4) {
+    return FALSE;
+  }
+  *Base = Cells == 2 ? ReadBe64 (Reg.Ptr + At) : ReadBe32 (Reg.Ptr + At);
+  return TRUE;
+}
+
 STATIC BOOLEAN
 RegBase (
   IN CONST DT_READ *R,
@@ -422,19 +534,51 @@ RegBase (
   OUT UINT64       *Base
 )
 {
-  UINTN      Parent;
-  UINT32     Cells = 2;
-  OABL_BYTES Reg;
+  return RegAt (R, Node, 0, Base);
+}
 
-  if (!DtParent (R->Fdt, R->Size, Node, &Parent)) {
+// Reads the TLMM's tiles, in the order of the SoC table's names, or its one
+// region.
+STATIC BOOLEAN
+TlmmTiles (
+  IN CONST DT_READ   *R,
+  OUT RSINPUT_CONFIG *Config
+)
+{
+  OABL_BYTES Names;
+
+  if (!R->Soc->TileNames[0]) {
+    return RegBase (R, R->TlmmNode, &Config->Tlmm[0]);
+  }
+  if (!Prop (R, R->TlmmNode, "reg-names", &Names)) {
     return FALSE;
   }
-  PropU32 (R, Parent, "#address-cells", &Cells);
-  if ((Cells != 1 && Cells != 2) || !Prop (R, Node, "reg", &Reg) ||
-      Reg.Len < Cells * 4) {
-    return FALSE;
+  for (UINTN Tile = 0; Tile < RSINPUT_TILES_MAX && R->Soc->TileNames[Tile];
+       Tile++) {
+    UINTN Entry = 0;
+    UINTN At    = 0;
+
+    // Find the name's position in reg-names.
+    while (At < Names.Len) {
+      UINTN End = At;
+
+      while (End < Names.Len && Names.Ptr[End]) {
+        End++;
+      }
+      if (TextEqStr (
+            (OABL_TEXT){(CONST CHAR8 *)Names.Ptr + At, End - At},
+            R->Soc->TileNames[Tile]
+          )) {
+        break;
+      }
+      At = End + 1;
+      Entry++;
+    }
+    if (At >= Names.Len ||
+        !RegAt (R, R->TlmmNode, Entry, &Config->Tlmm[Tile])) {
+      return FALSE;
+    }
   }
-  *Base = Cells == 2 ? ReadBe64 (Reg.Ptr) : ReadBe32 (Reg.Ptr);
   return TRUE;
 }
 
@@ -818,10 +962,14 @@ FindSoc (
   return RSINPUT_DT_UNKNOWN_SOC;
 }
 
-STATIC CONST CHAR8 *CONST mCompatibles[] = {
-  "retroidpocket,rsinput",
-  "ayntec,rsinput",
-  "gamepad,rsinput",
+STATIC CONST struct {
+  CONST CHAR8 *Compatible;
+  UINT8        Driver;
+} mCompatibles[] = {
+  {"retroidpocket,rsinput", RSINPUT_DRIVER_RSINPUT},
+  {"ayntec,rsinput", RSINPUT_DRIVER_RSINPUT},
+  {"gamepad,rsinput", RSINPUT_DRIVER_RSINPUT},
+  {"retroid,retroid-pocket-gamepad", RSINPUT_DRIVER_RETROID},
 };
 
 RSINPUT_DT_RESULT
@@ -842,10 +990,12 @@ RsInputFromDt (
   ZeroMem (Config, sizeof (*Config));
   for (UINTN Index = 0; Index < COUNT_OF (mCompatibles) && !Found; Index++) {
     Pad = DT_START;
-    while (!Found &&
-           DtNextCompatible (Fdt, Size, mCompatibles[Index], Pad, &Pad)) {
+    while (
+      !Found &&
+      DtNextCompatible (Fdt, Size, mCompatibles[Index].Compatible, Pad, &Pad)) {
       Found = DtIsEnabled (Fdt, Size, Pad);
     }
+    Config->Driver = mCompatibles[Index].Driver;
   }
   if (!Found) {
     return RSINPUT_DT_NONE;
@@ -860,8 +1010,7 @@ RsInputFromDt (
     return Result;
   }
   if (!RegBase (&R, Uart, &Config->Uart) ||
-      !RegBase (&R, Wrapper, &Config->Wrapper) ||
-      !RegBase (&R, R.TlmmNode, &Config->Tlmm) ||
+      !RegBase (&R, Wrapper, &Config->Wrapper) || !TlmmTiles (&R, Config) ||
       !RegBase (&R, R.GccNode, &Config->Gcc)) {
     return RSINPUT_DT_BAD;
   }
@@ -904,7 +1053,15 @@ TlmmCfg (
   IN UINT16                Gpio
 )
 {
-  return Config->Tlmm + (UINT64)Gpio * mSocs[Config->Soc].TlmmStride;
+  CONST SOC_TABLE *Soc  = &mSocs[Config->Soc];
+  UINT8            Tile = 0;
+
+  for (UINTN Index = 0; Index < Soc->TileCount; Index++) {
+    if (Gpio >= Soc->Tiles[Index].First && Gpio <= Soc->Tiles[Index].Last) {
+      Tile = Soc->Tiles[Index].Tile;
+    }
+  }
+  return Config->Tlmm[Tile] + (UINT64)Gpio * Soc->TlmmStride;
 }
 
 STATIC UINT32
