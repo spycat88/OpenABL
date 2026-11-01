@@ -15,17 +15,6 @@
 #define MIB ((UINT64)1 << 20)
 #define GIB ((UINT64)1 << 30)
 
-VOID
-SysInfoFree (IN OUT SYS_INFO *Info)
-{
-  FreePool (Info->Soc);
-  FreePool (Info->Ram);
-  FreePool (Info->Storage);
-  FreePool (Info->SdCard);
-  FreePool (Info->Firmware);
-  *Info = (SYS_INFO){0};
-}
-
 CHAR8 *
 SysInfoFormatBytes (IN UINT64 Bytes)
 {

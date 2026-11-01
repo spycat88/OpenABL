@@ -389,22 +389,6 @@ fdt_path_offset (
   return mLib ? mLib->fdt_path_offset (Fdt, Path) : NO_LIB;
 }
 
-CONST CHAR8 *
-fdt_get_name (
-  IN CONST VOID *Fdt,
-  IN INT32       Nodeoffset,
-  OUT INT32     *Lenp OPTIONAL
-)
-{
-  if (mLib) {
-    return mLib->fdt_get_name (Fdt, Nodeoffset, Lenp);
-  }
-  if (Lenp) {
-    *Lenp = NO_LIB;
-  }
-  return NULL;
-}
-
 CONST VOID *
 fdt_getprop (
   IN CONST VOID  *Fdt,
@@ -420,66 +404,4 @@ fdt_getprop (
     *Lenp = NO_LIB;
   }
   return NULL;
-}
-
-INT32
-fdt_next_node (
-  IN CONST VOID *Fdt,
-  IN INT32       Offset,
-  IN OUT INT32  *Depth OPTIONAL
-)
-{
-  return mLib ? mLib->fdt_next_node (Fdt, Offset, Depth) : NO_LIB;
-}
-
-INT32
-fdt_first_subnode (
-  IN CONST VOID *Fdt,
-  IN INT32       Offset
-)
-{
-  return mLib ? mLib->fdt_first_subnode (Fdt, Offset) : NO_LIB;
-}
-
-INT32
-fdt_next_subnode (
-  IN CONST VOID *Fdt,
-  IN INT32       Offset
-)
-{
-  return mLib ? mLib->fdt_next_subnode (Fdt, Offset) : NO_LIB;
-}
-
-INT32
-fdt_node_offset_by_compatible (
-  IN CONST VOID  *Fdt,
-  IN INT32        Startoffset,
-  IN CONST CHAR8 *Compatible
-)
-{
-  return mLib
-           ? mLib->fdt_node_offset_by_compatible (Fdt, Startoffset, Compatible)
-           : NO_LIB;
-}
-
-INT32
-fdt_setprop (
-  IN OUT VOID    *Fdt,
-  IN INT32        Nodeoffset,
-  IN CONST CHAR8 *Name,
-  IN CONST VOID  *Val,
-  IN INT32        Len
-)
-{
-  return mLib ? mLib->fdt_setprop (Fdt, Nodeoffset, Name, Val, Len) : NO_LIB;
-}
-
-INT32
-fdt_add_subnode (
-  IN OUT VOID    *Fdt,
-  IN INT32        Parentoffset,
-  IN CONST CHAR8 *Name
-)
-{
-  return mLib ? mLib->fdt_add_subnode (Fdt, Parentoffset, Name) : NO_LIB;
 }

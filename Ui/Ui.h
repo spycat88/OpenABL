@@ -525,13 +525,6 @@ AppCountdownSeconds (
   OUT UINT64   *Seconds
 );
 
-// For callers that allocate APP and SETTINGS elsewhere.
-UINTN
-AppSize (VOID);
-
-UINTN
-AppSettingsSize (VOID);
-
 // Keys
 //
 // Firmware key protocols report presses but not releases. USB keyboards

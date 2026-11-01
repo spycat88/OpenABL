@@ -207,18 +207,6 @@ BootEntryParent (IN CONST CHAR8 *Path)
   return TextSub (Text, 0, Slash);
 }
 
-OABL_TEXT
-BootEntryFileName (IN CONST CHAR8 *Path)
-{
-  OABL_TEXT Text = TextOf (Path);
-  UINTN     Slash;
-
-  if (!TextFindLastChar (Text, '\\', &Slash)) {
-    return Text;
-  }
-  return TextSub (Text, Slash + 1, Text.Len);
-}
-
 // Entry file parsing helpers
 
 VOID

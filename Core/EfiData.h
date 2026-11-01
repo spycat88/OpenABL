@@ -22,10 +22,6 @@
 #include "Base/Buffer.h"
 #include "Base/Text.h"
 
-#define UEFI_GLOBAL_VARIABLE_GUID     "8be4df61-93ca-11d2-aa0d-00e098032b8c"
-#define UEFI_DTB_TABLE_GUID           "b1b621d5-f19c-41a5-830b-d9152c69aae0"
-#define UEFI_RT_PROPERTIES_TABLE_GUID "eb66918a-7eef-402a-842e-931d21c38ae9"
-
 #define UEFI_LOAD_OPTION_ACTIVE 0x00000001u
 
 // Removable media default boot file for AArch64 (UEFI section 3.5.1.1).
@@ -50,13 +46,6 @@ UefiParseU16List (
   OUT UEFI_U16_LIST *Out
 );
 
-BOOLEAN
-UefiU16ListBytes (
-  IN CONST UINT16 *Values,
-  IN UINTN         Count,
-  OUT OABL_BUFFER *Out
-);
-
 // EFI_LOAD_OPTION. Owns all its fields.
 typedef struct _UEFI_LOAD_OPTION {
   UINT32 Attributes;
@@ -72,12 +61,6 @@ UefiLoadOptionParse (
   IN CONST UINT8       *Bytes,
   IN UINTN              Size,
   OUT UEFI_LOAD_OPTION *Out
-);
-
-BOOLEAN
-UefiLoadOptionToBytes (
-  IN CONST UEFI_LOAD_OPTION *Option,
-  OUT OABL_BUFFER           *Out
 );
 
 VOID
@@ -199,16 +182,6 @@ UefiClassify (
 CONST CHAR8 *
 UefiPathKindName (IN UEFI_PATH_KIND Kind);
 
-// Splits a path at the first FilePath node into a device part and a file
-// part, each with an end node.
-BOOLEAN
-UefiSplitFile (
-  IN CONST UINT8  *DevicePath,
-  IN UINTN         Size,
-  OUT OABL_BUFFER *Device,
-  OUT OABL_BUFFER *File
-);
-
 // Offsets of HeaderSize and CRC32 in EFI_TABLE_HEADER (UEFI section 4.2).
 #define UEFI_TABLE_HEADER_SIZE  12
 #define UEFI_TABLE_HEADER_CRC32 16
@@ -265,15 +238,6 @@ UefiEsrtOne (
 // start with a number.
 UINT32
 UefiVersionPair (IN CONST CHAR8 *Version);
-
-// Fails if the table is too short.
-BOOLEAN
-UefiParseRtProperties (
-  IN CONST UINT8 *Table,
-  IN UINTN        Size,
-  OUT UINT16     *Version,
-  OUT UINT32     *Supported
-);
 
 // Copies a DTB and grows its totalsize by Pad bytes of free space, so the
 // next stage can add /chosen properties in place. Fails if Blob isn't a DTB.

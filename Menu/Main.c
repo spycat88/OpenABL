@@ -438,15 +438,14 @@ Resident (VOID)
   return LoadedImage && LoadedImage->ImageCodeType == EfiBootServicesCode;
 }
 
-// Brings USB host up and installs its protocol. EFI_SUCCESS means something
-// stays on, so we must stay loaded.
+// Brings USB host up. EFI_SUCCESS means something stays on, so we must stay
+// loaded.
 STATIC EFI_STATUS
 UsbHostUpQuirked (VOID)
 {
   QCOM_CHIP        Chip;
   USB_HOST_BOARD   Board;
   USB_HOST_OUTCOME Outcome;
-  EFI_STATUS       Status;
   UINT32           Id;
 
   if (!Resident ()) {
@@ -465,10 +464,6 @@ UsbHostUpQuirked (VOID)
   Outcome = UsbHostBringUp (Board, gMenuEfiLog);
   if (!Outcome.Resident) {
     return EFI_NOT_FOUND;
-  }
-  Status = UsbHostInstallProtocol ();
-  if (EFI_ERROR (Status)) {
-    MenuLog ("offering the USB host protocol failed: %s", MENU_STATUS (Status));
   }
   return EFI_SUCCESS;
 }

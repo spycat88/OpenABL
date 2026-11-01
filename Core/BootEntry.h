@@ -129,9 +129,6 @@ BootEntryUefiPaths (
 OABL_TEXT
 BootEntryParent (IN CONST CHAR8 *Path);
 
-OABL_TEXT
-BootEntryFileName (IN CONST CHAR8 *Path);
-
 // Entry file parsing helpers
 
 // Splits a "key value" line at its first ASCII whitespace and trims the

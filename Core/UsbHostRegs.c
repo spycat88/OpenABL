@@ -263,37 +263,3 @@ UsbHostConnected (IN USB_HOST_PORTSC Ports)
 {
   return ((Ports.Portsc1 | Ports.Portsc2) & USB_HOST_DWC3_PORTSC_CCS) != 0;
 }
-
-CHAR8 *
-UsbHostHex (IN UINT64 Value)
-{
-  return SPrintAlloc ("0x%llx", (UINT64)Value);
-}
-
-CHAR8 *
-UsbHostDec (IN UINT64 Value)
-{
-  return SPrintAlloc ("%llu", (UINT64)Value);
-}
-
-CHAR8 *
-UsbHostHexBuf (
-  OUT CHAR8 *Out,
-  IN UINTN   Size,
-  IN UINT64  Value
-)
-{
-  SPrint (Out, Size, "0x%llx", (UINT64)Value);
-  return Out;
-}
-
-CHAR8 *
-UsbHostDecBuf (
-  OUT CHAR8 *Out,
-  IN UINTN   Size,
-  IN UINT64  Value
-)
-{
-  SPrint (Out, Size, "%llu", (UINT64)Value);
-  return Out;
-}

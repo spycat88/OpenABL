@@ -54,16 +54,6 @@ CopyMem (
 }
 
 STATIC inline VOID *
-SetMem (
-  OUT VOID *Buffer,
-  IN UINTN  Length,
-  IN UINT8  Value
-)
-{
-  return __builtin_memset (Buffer, Value, Length);
-}
-
-STATIC inline VOID *
 ZeroMem (
   OUT VOID *Buffer,
   IN UINTN  Length

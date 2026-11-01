@@ -17,24 +17,6 @@
 #include <stdarg.h>
 #include "Base/OablBase.h"
 
-// Writes the text and "\r\n" to the first serial port, if there is one.
-VOID
-SerialWriteLine (
-  IN CONST CHAR8 *Format,
-  ...
-)
-  __attribute__ ((format (
-    printf,
-    1,
-    2
-  )));
-
-VOID
-SerialVWriteLine (
-  IN CONST CHAR8 *Format,
-  IN va_list      Args
-);
-
 #ifdef OABL_DEBUG
 // From now on, also writes the lines to the text console (debug builds).
 VOID

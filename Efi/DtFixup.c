@@ -24,7 +24,6 @@ STATIC EFI_GUID mDtFixupGuid = {
   {0xf4, 0xdc, 0xbb, 0xd5, 0x87, 0x0c, 0x73, 0x00}};
 #define DT_FIXUP_REVISION 0x00010000ull
 #define DT_APPLY_FIXUPS   1u
-#define DT_RESERVE_MEMORY 2u
 #define DT_INSTALL_TABLE  4u
 
 #define FDT_MAGIC       0xd00dfeedu
@@ -50,8 +49,9 @@ STATIC LOG_SINK mLog;
 STATIC BOOLEAN  mInstalled;
 
 // Hands the splash over in the loader's tree on DT_APPLY_FIXUPS and installs
-// it as the devicetree table on DT_INSTALL_TABLE. DT_RESERVE_MEMORY is a
-// no-op: XBL's memory map already keeps the carveouts and display reserved.
+// it as the devicetree table on DT_INSTALL_TABLE. The reserve-memory flag
+// (2) is a no-op: XBL's memory map already keeps the carveouts and display
+// reserved.
 STATIC EFI_STATUS EFIAPI
 Fixup (
   IN DT_FIXUP_PROTOCOL *This,

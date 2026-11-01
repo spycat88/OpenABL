@@ -46,43 +46,6 @@ VecGrow (
 }
 
 VOID
-VecRemoveRaw (
-  IN OUT VOID  *Items,
-  IN OUT UINTN *Count,
-  IN UINTN      Index,
-  IN UINTN      Size
-)
-{
-  UINT8 *Bytes = Items;
-  if (Index >= *Count) {
-    return;
-  }
-  for (UINTN At = Index * Size; At < (*Count - 1) * Size; At++) {
-    Bytes[At] = Bytes[At + Size];
-  }
-  (*Count)--;
-}
-
-UINTN
-VecOpenRaw (
-  IN OUT VOID  *Items,
-  IN OUT UINTN *Count,
-  IN UINTN      Index,
-  IN UINTN      Size
-)
-{
-  UINT8 *Bytes = Items;
-  if (Index > *Count) {
-    Index = *Count;
-  }
-  for (UINTN At = (*Count + 1) * Size; At-- > (Index + 1) * Size;) {
-    Bytes[At] = Bytes[At - Size];
-  }
-  (*Count)++;
-  return Index;
-}
-
-VOID
 VecFreeRaw (IN OUT VOID **Items)
 {
   FreePool (*Items);
@@ -150,40 +113,6 @@ BufferAppendLe32 (
 }
 
 BOOLEAN
-BufferAppendLe64 (
-  IN OUT OABL_BUFFER *Buffer,
-  IN UINT64           Value
-)
-{
-  UINT8 Bytes[8];
-  WriteLe64 (Bytes, Value);
-  return BufferAppend (Buffer, Bytes, sizeof (Bytes));
-}
-
-BOOLEAN
-BufferAppendBe32 (
-  IN OUT OABL_BUFFER *Buffer,
-  IN UINT32           Value
-)
-{
-  UINT8 Bytes[4];
-  WriteBe32 (Bytes, Value);
-  return BufferAppend (Buffer, Bytes, sizeof (Bytes));
-}
-
-BOOLEAN
-BufferAppendBe64 (
-  IN OUT OABL_BUFFER *Buffer,
-  IN UINT64           Value
-)
-{
-  UINT8 Bytes[8];
-  WriteBe32 (Bytes, (UINT32)(Value >> 32));
-  WriteBe32 (Bytes + 4, (UINT32)Value);
-  return BufferAppend (Buffer, Bytes, sizeof (Bytes));
-}
-
-BOOLEAN
 BufferAppendZeros (
   IN OUT OABL_BUFFER *Buffer,
   IN UINTN            Length
@@ -220,20 +149,6 @@ BufferFree (IN OUT OABL_BUFFER *Buffer)
   *Buffer = (OABL_BUFFER){0};
 }
 
-UINT8 *
-BufferTake (
-  IN OUT OABL_BUFFER *Buffer,
-  OUT UINTN          *Length OPTIONAL
-)
-{
-  UINT8 *Data = Buffer->Data;
-  if (Length) {
-    *Length = Buffer->Len;
-  }
-  *Buffer = (OABL_BUFFER){0};
-  return Data;
-}
-
 BOOLEAN
 GetLe16 (
   IN CONST UINT8 *Bytes,
@@ -265,21 +180,6 @@ GetLe32 (
 }
 
 BOOLEAN
-GetLe64 (
-  IN CONST UINT8 *Bytes,
-  IN UINTN        Size,
-  IN UINTN        At,
-  OUT UINT64     *Value
-)
-{
-  if (!InBounds (Size, At, 8)) {
-    return FALSE;
-  }
-  *Value = ReadLe64 (Bytes + At);
-  return TRUE;
-}
-
-BOOLEAN
 GetBe32 (
   IN CONST UINT8 *Bytes,
   IN UINTN        Size,
@@ -291,21 +191,6 @@ GetBe32 (
     return FALSE;
   }
   *Value = ReadBe32 (Bytes + At);
-  return TRUE;
-}
-
-BOOLEAN
-GetBe64 (
-  IN CONST UINT8 *Bytes,
-  IN UINTN        Size,
-  IN UINTN        At,
-  OUT UINT64     *Value
-)
-{
-  if (!InBounds (Size, At, 8)) {
-    return FALSE;
-  }
-  *Value = ReadBe64 (Bytes + At);
   return TRUE;
 }
 

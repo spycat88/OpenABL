@@ -31,18 +31,6 @@ Command (
   return (COMMAND){.Kind = Kind, .Arg = Arg};
 }
 
-UINTN
-AppSize (VOID)
-{
-  return sizeof (APP);
-}
-
-UINTN
-AppSettingsSize (VOID)
-{
-  return sizeof (SETTINGS);
-}
-
 VOID
 AppInit (
   OUT APP                *A,

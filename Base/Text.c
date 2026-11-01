@@ -73,17 +73,6 @@ TextStartsWith (
 }
 
 BOOLEAN
-TextStartsWithNoCase (
-  IN OABL_TEXT    Text,
-  IN CONST CHAR8 *Prefix
-)
-{
-  UINTN Length = AsciiStrLen (Prefix);
-  return Length <= Text.Len &&
-         TextEqNoCase ((OABL_TEXT){Text.Ptr, Length}, Prefix);
-}
-
-BOOLEAN
 TextEndsWithNoCase (
   IN OABL_TEXT    Text,
   IN CONST CHAR8 *Suffix
@@ -267,28 +256,6 @@ TextNextLine (
     Rest->Ptr += Rest->Len;
     Rest->Len = 0;
   }
-  return TRUE;
-}
-
-BOOLEAN
-TextNextWord (
-  IN OUT OABL_TEXT *Rest,
-  OUT OABL_TEXT    *Word
-)
-{
-  UINTN End = 0;
-  UINTN Length;
-  *Rest = TextTrimStart (*Rest);
-  if (!Rest->Len) {
-    return FALSE;
-  }
-  while (End < Rest->Len && !SpaceAt (TextSub (*Rest, End, Rest->Len))) {
-    Utf8Decode (Rest->Ptr + End, Rest->Len - End, &Length);
-    End += Length;
-  }
-  *Word = (OABL_TEXT){Rest->Ptr, End};
-  Rest->Ptr += End;
-  Rest->Len -= End;
   return TRUE;
 }
 

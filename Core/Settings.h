@@ -88,7 +88,7 @@ typedef struct _SETTINGS {
 #define SETTINGS_KEY_DISPLAY_QUIESCE "DisplayQuiesce"
 #define SETTINGS_KEY_CUSTOM_LOGO     "CustomLogo"
 #define SETTINGS_KEY_LANGUAGE        "MenuLanguage"
-// Experimental, and no menu sets it yet: 1 starts USB host in the same
+// Experimental, set from the Debug section: 1 starts USB host in the same
 // boot as fastboot instead of restarting. On the glink SoCs XBL died when a
 // drive was attached after the gadget had run.
 #define SETTINGS_KEY_USB_HOST_LIVE "UsbHostLive"

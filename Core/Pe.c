@@ -58,18 +58,6 @@ PeIsPe (
 }
 
 BOOLEAN
-PeMachine (
-  IN CONST UINT8 *Head,
-  IN UINTN        Size,
-  OUT UINT16     *Machine
-)
-{
-  UINTN CoffOffset;
-  return CoffHeader (Head, Size, &CoffOffset) &&
-         GetLe16 (Head, Size, CoffOffset, Machine);
-}
-
-BOOLEAN
 PeSections (
   IN CONST UINT8  *Head,
   IN UINTN         Size,

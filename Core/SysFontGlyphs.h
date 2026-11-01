@@ -29,13 +29,6 @@
 // EDK2's 8x19 narrow font. One byte per row, leftmost pixel in the top bit.
 extern CONST UINT8 gSysFontGlyphs[SYSFONT_COUNT * SYSFONT_HEIGHT];
 
-// Scales the glyphs by Scale, at most 8. Caller frees Out.
-BOOLEAN
-SysFontScaled (
-  IN UINT8         Scale,
-  OUT OABL_BUFFER *Out
-);
-
 // Builds the HII package list for sysfont{Scale}x, laid out like the ABL's,
 // with GUID 46c1220e-be05-4375-8be6-2396ae7b42NN where NN is the scale.
 // Caller frees Out.

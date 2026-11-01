@@ -12,7 +12,6 @@
 #include <limits.h>
 
 #include "Base/Memory.h"
-#include "Base/Print.h"
 #include "Core/LibFdt.h"
 
 STATIC OABL_TEXT
@@ -339,15 +338,6 @@ Usable (
   return HeaderOk (Fdt, Size) && WalkOk (Fdt, Node);
 }
 
-STATIC DT_ERROR
-DtError (IN INT32 Status)
-{
-  if (Status >= 0) {
-    return DT_OK;
-  }
-  return Status == -FDT_ERR_NOSPACE ? DT_NO_SPACE : DT_BAD_BLOB;
-}
-
 // Thin libfdt wrappers. The blob must have passed Usable.
 
 STATIC BOOLEAN
@@ -385,51 +375,6 @@ AtPath (
   return TRUE;
 }
 
-STATIC DT_ERROR
-Set (
-  IN OUT UINT8   *Fdt,
-  IN UINTN        Node,
-  IN CONST CHAR8 *Name,
-  IN CONST VOID  *Value,
-  IN UINTN        Length
-)
-{
-  if (Length > INT_MAX) {
-    return DT_NO_SPACE;
-  }
-  return DtError (fdt_setprop (Fdt, (INT32)Node, Name, Value, (INT32)Length));
-}
-
-STATIC DT_ERROR
-Add (
-  IN OUT UINT8   *Fdt,
-  IN UINTN        Parent,
-  IN CONST CHAR8 *Name,
-  OUT UINTN      *Node
-)
-{
-  INT32 Offset = fdt_add_subnode (Fdt, (INT32)Parent, Name);
-
-  if (Offset < 0) {
-    return DtError (Offset);
-  }
-  *Node = (UINTN)Offset;
-  return DT_OK;
-}
-
-// Returns the node's name, or "" if it can't be read.
-STATIC OABL_TEXT
-NameOf (
-  IN CONST VOID *Fdt,
-  IN INT32       Node
-)
-{
-  INT32        Length;
-  CONST CHAR8 *Name = fdt_get_name (Fdt, Node, &Length);
-
-  return Name ? (OABL_TEXT){Name, (UINTN)Length} : (OABL_TEXT){"", 0};
-}
-
 // Lookups and subnodes
 
 BOOLEAN
@@ -444,25 +389,6 @@ DtNodeAtPath (
 }
 
 BOOLEAN
-DtNodeName (
-  IN CONST UINT8 *Fdt,
-  IN UINTN        Size,
-  IN UINTN        Node,
-  OUT OABL_BYTES *Name
-)
-{
-  CONST CHAR8 *NodeName;
-  INT32        Length;
-
-  if (!Usable (Fdt, Size, Node) ||
-      !(NodeName = fdt_get_name (Fdt, (INT32)Node, &Length))) {
-    return FALSE;
-  }
-  *Name = (OABL_BYTES){(CONST UINT8 *)NodeName, (UINTN)Length};
-  return TRUE;
-}
-
-BOOLEAN
 DtPropAt (
   IN CONST UINT8 *Fdt,
   IN UINTN        Size,
@@ -472,206 +398,4 @@ DtPropAt (
 )
 {
   return Usable (Fdt, Size, Node) && Get (Fdt, Node, Name, Value);
-}
-
-DT_ERROR
-DtAddSubnode (
-  IN OUT UINT8   *Fdt,
-  IN UINTN        Capacity,
-  IN UINTN        Parent,
-  IN CONST CHAR8 *Name,
-  OUT UINTN      *Node
-)
-{
-  if (!Usable (Fdt, Capacity, Parent)) {
-    return DT_BAD_BLOB;
-  }
-  return Add (Fdt, Parent, Name, Node);
-}
-
-BOOLEAN
-DtChosenHas (
-  IN CONST UINT8 *Fdt,
-  IN UINTN        Size,
-  IN CONST CHAR8 *Prefix
-)
-{
-  if (!Usable (Fdt, Size, NO_NODE)) {
-    return FALSE;
-  }
-  // Every child of the root named chosen, but not chosen@...
-  for (INT32 Child = fdt_first_subnode (Fdt, 0); Child >= 0;
-       Child       = fdt_next_subnode (Fdt, Child)) {
-    if (!TextEqStr (NameOf (Fdt, Child), "chosen")) {
-      continue;
-    }
-    for (INT32 Grandchild = fdt_first_subnode (Fdt, Child); Grandchild >= 0;
-         Grandchild       = fdt_next_subnode (Fdt, Grandchild)) {
-      if (TextStartsWith (NameOf (Fdt, Grandchild), Prefix)) {
-        return TRUE;
-      }
-    }
-  }
-  return FALSE;
-}
-
-BOOLEAN
-DtNodeChildren (
-  IN CONST UINT8 *Fdt,
-  IN UINTN        Size,
-  IN UINTN        Node,
-  OUT DT_NODES   *Out
-)
-{
-  *Out = (DT_NODES){0};
-  if (!Usable (Fdt, Size, Node)) {
-    return TRUE;
-  }
-  for (INT32 Child = fdt_first_subnode (Fdt, (INT32)Node); Child >= 0;
-       Child       = fdt_next_subnode (Fdt, Child)) {
-    if (!VecPush (Out, (UINTN)Child)) {
-      return FALSE;
-    }
-  }
-  return TRUE;
-}
-
-STATIC CHAR8 *
-UnitName (
-  IN CONST CHAR8 *Prefix,
-  IN UINT64       Address
-)
-{
-  return SPrintAlloc ("%s@%llx", Prefix, (UINT64)Address);
-}
-
-// Reads #address-cells or #size-cells. Fails unless it is 4 bytes.
-STATIC BOOLEAN
-CellsOf (
-  IN CONST UINT8 *Fdt,
-  IN UINTN        Node,
-  IN CONST CHAR8 *Name,
-  OUT UINT32     *Cells
-)
-{
-  OABL_BYTES Property;
-
-  if (!Get (Fdt, Node, Name, &Property) || Property.Len != 4) {
-    return FALSE;
-  }
-  *Cells = ReadBe32 (Property.Ptr);
-  return TRUE;
-}
-
-STATIC UINT64
-ReadCells (
-  IN CONST UINT8 *Bytes,
-  IN UINTN        Size
-)
-{
-  UINT64 Value = 0;
-
-  for (UINTN Index = 0; Index < Size; Index++) {
-    Value = Value << 8 | Bytes[Index];
-  }
-  return Value;
-}
-
-// Writes Value as 1 or 2 cells and returns the bytes written.
-STATIC UINTN
-PushCells (
-  OUT UINT8 *Out,
-  IN UINT64  Value,
-  IN UINT32  Cells
-)
-{
-  if (Cells == 1) {
-    WriteBe32 (Out, (UINT32)Value);
-    return 4;
-  }
-  WriteBe32 (Out, (UINT32)(Value >> 32));
-  WriteBe32 (Out + 4, (UINT32)Value);
-  return 8;
-}
-
-DT_ERROR
-DtReserveMemoryNamed (
-  IN OUT UINT8   *Fdt,
-  IN UINTN        Capacity,
-  IN CONST CHAR8 *Prefix,
-  IN UINT64       Base,
-  IN UINT64       Size,
-  OUT BOOLEAN    *Added
-)
-{
-  UINTN      Root;
-  UINTN      ReservedMemory;
-  UINTN      Node;
-  UINTN      AddressBytes;
-  UINTN      SizeBytes;
-  UINTN      Length;
-  UINT32     AddressCells = 2;
-  UINT32     SizeCells    = 1;
-  DT_ERROR   Status;
-  OABL_BYTES Reg;
-  UINT8      Buffer[16];
-  CHAR8     *Name;
-
-  *Added = FALSE;
-  if (!Usable (Fdt, Capacity, NO_NODE) || !AtPath (Fdt, "/", &Root)) {
-    return DT_BAD_BLOB;
-  }
-  CellsOf (Fdt, Root, "#address-cells", &AddressCells);
-  CellsOf (Fdt, Root, "#size-cells", &SizeCells);
-  if (!AtPath (Fdt, "/reserved-memory", &ReservedMemory)) {
-    if ((Status = Add (Fdt, Root, "reserved-memory", &ReservedMemory)) ||
-        (Status = Set (Fdt, ReservedMemory, "ranges", "", 0))) {
-      return Status;
-    }
-    WriteBe32 (Buffer, SizeCells);
-    if ((Status = Set (Fdt, ReservedMemory, "#size-cells", Buffer, 4))) {
-      return Status;
-    }
-    WriteBe32 (Buffer, AddressCells);
-    if ((Status = Set (Fdt, ReservedMemory, "#address-cells", Buffer, 4))) {
-      return Status;
-    }
-  }
-  CellsOf (Fdt, ReservedMemory, "#address-cells", &AddressCells);
-  CellsOf (Fdt, ReservedMemory, "#size-cells", &SizeCells);
-  if (AddressCells < 1 || AddressCells > 2 || SizeCells < 1 || SizeCells > 2) {
-    return DT_BAD_BLOB;
-  }
-  AddressBytes = AddressCells * 4;
-  SizeBytes    = SizeCells * 4;
-  for (INT32 Child = fdt_first_subnode (Fdt, (INT32)ReservedMemory); Child >= 0;
-       Child       = fdt_next_subnode (Fdt, Child)) {
-    if (!Get (Fdt, (UINTN)Child, "reg", &Reg)) {
-      continue;
-    }
-    for (UINTN At = 0; At + AddressBytes + SizeBytes <= Reg.Len;
-         At += AddressBytes + SizeBytes) {
-      UINT64 RegionBase = ReadCells (Reg.Ptr + At, AddressBytes);
-      UINT64 RegionSize = ReadCells (Reg.Ptr + At + AddressBytes, SizeBytes);
-      if (RegionBase <= Base && Base + Size <= RegionBase + RegionSize) {
-        return DT_OK;
-      }
-    }
-  }
-  Name = UnitName (Prefix, Base);
-  if (!Name) {
-    return DT_NO_SPACE;
-  }
-  Status = Add (Fdt, ReservedMemory, Name, &Node);
-  FreePool (Name);
-  if (Status || (Status = Set (Fdt, Node, "no-map", "", 0))) {
-    return Status;
-  }
-  Length = PushCells (Buffer, Base, AddressCells);
-  Length += PushCells (Buffer + Length, Size, SizeCells);
-  if ((Status = Set (Fdt, Node, "reg", Buffer, Length))) {
-    return Status;
-  }
-  *Added = TRUE;
-  return DT_OK;
 }

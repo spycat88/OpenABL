@@ -324,14 +324,13 @@ _Static_assert (
 
 // State for the callbacks
 
-STATIC BOOLEAN            mHaveBoard;
-STATIC USB_HOST_BOARD     mBoard;
-STATIC BOOLEAN            mUp;
-STATIC BOOLEAN            mVbusOnByUs;
-STATIC BOOLEAN            mAdspLoaded;
-STATIC UINT64             mCoreBase;
-STATIC EFI_HANDLE         mDevice;
-STATIC USB_HOST_PROTOCOL *mProtocol;
+STATIC BOOLEAN        mHaveBoard;
+STATIC USB_HOST_BOARD mBoard;
+STATIC BOOLEAN        mUp;
+STATIC BOOLEAN        mVbusOnByUs;
+STATIC BOOLEAN        mAdspLoaded;
+STATIC UINT64         mCoreBase;
+STATIC EFI_HANDLE     mDevice;
 // The ExitBootServices callback is registered.
 STATIC BOOLEAN mAtExit;
 
@@ -1331,14 +1330,6 @@ UsbHostBringUp (
 
 // After the bring-up
 
-STATIC VOID
-PublishFlags (VOID)
-{
-  if (mProtocol) {
-    mProtocol->Flags = mUp ? USB_HOST_FLAG_UP : 0;
-  }
-}
-
 VOID
 UsbHostTeardown (VOID)
 {
@@ -1352,7 +1343,6 @@ UsbHostTeardown (VOID)
   }
   RevertToDevice (LocateProtocol (&mUsbConfigGuid), LOG_QUIET);
   mVbusOnByUs = FALSE;
-  PublishFlags ();
 }
 
 VOID
@@ -1364,7 +1354,6 @@ UsbHostReleaseVbus (VOID)
   mVbusOnByUs = FALSE;
   BoardVbus (FALSE, LOG_QUIET);
   mUp = FALSE;
-  PublishFlags ();
 }
 
 BOOLEAN
@@ -1374,93 +1363,10 @@ UsbHostIsUp (VOID)
 }
 
 VOID
-UsbHostOsHandoff (VOID)
-{
-  AdspShutdown ();
-}
-
-VOID
 UsbHostBeforeReset (VOID)
 {
   UsbHostTeardown ();
   
   mAdspLoaded = FALSE;
   UsbHostReleaseVbus ();
-}
-
-STATIC VOID EFIAPI
-ProtocolTeardown (IN USB_HOST_PROTOCOL *This)
-{
-  (VOID)This;
-  UsbHostTeardown ();
-}
-
-STATIC VOID EFIAPI
-ProtocolReleaseVbus (IN USB_HOST_PROTOCOL *This)
-{
-  (VOID)This;
-  UsbHostReleaseVbus ();
-}
-
-STATIC VOID EFIAPI
-ProtocolOsHandoff (IN USB_HOST_PROTOCOL *This)
-{
-  (VOID)This;
-  UsbHostOsHandoff ();
-}
-
-STATIC EFI_STATUS EFIAPI
-ProtocolBringUp (
-  IN USB_HOST_PROTOCOL  *This,
-  IN OPENABL_STORAGE_LOG AblLog OPTIONAL
-)
-{
-  LOG_SINK Log;
-  UINT32   Chip;
-  BOOLEAN  NowUp;
-
-  (VOID)This;
-  if (!mHaveBoard) {
-    return EFI_NOT_READY;
-  }
-  Log = QuirksAblLog (AblLog);
-  // As for the first bring-up: the GPT quirk before a drive's partitions
-  // are read, the FAT quirk on what it mounts.
-  Chip = QuirksChipId ();
-  QuirksGptClobber (Chip, Log);
-  NowUp = UsbHostBringUp (mBoard, Log).Up;
-  QuirksFatCache (Chip, Log);
-  PublishFlags ();
-  return NowUp ? EFI_SUCCESS : EFI_NOT_FOUND;
-}
-
-EFI_STATUS
-UsbHostInstallProtocol (VOID)
-{
-  STATIC EFI_GUID    Guid = USB_HOST_PROTOCOL_GUID;
-  USB_HOST_PROTOCOL *Protocol;
-  EFI_HANDLE         Handle = NULL;
-
-  if (mProtocol) {
-    PublishFlags ();
-    return EFI_SUCCESS;
-  }
-  Protocol = AllocatePool (sizeof (*Protocol));
-  if (!Protocol) {
-    return EFI_OUT_OF_RESOURCES;
-  }
-  *Protocol = (USB_HOST_PROTOCOL){
-    .Revision    = USB_HOST_PROTOCOL_REVISION,
-    .Flags       = 0,
-    .Teardown    = ProtocolTeardown,
-    .ReleaseVbus = ProtocolReleaseVbus,
-    .OsHandoff   = ProtocolOsHandoff,
-    .BringUp     = ProtocolBringUp,
-  };
-  mProtocol = Protocol;
-  PublishFlags ();
-  // Never freed, so it outlives the handle.
-  return gBS->InstallProtocolInterface (
-    &Handle, &Guid, EFI_NATIVE_INTERFACE, Protocol
-  );
 }

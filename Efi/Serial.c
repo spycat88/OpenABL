@@ -79,31 +79,6 @@ Emit (IN OUT OABL_STRING *Line)
 }
 
 VOID
-SerialVWriteLine (
-  IN CONST CHAR8 *Format,
-  IN va_list      Args
-)
-{
-  OABL_STRING Line = {0};
-
-  StringVPrint (&Line, Format, Args);
-  Emit (&Line);
-}
-
-VOID
-SerialWriteLine (
-  IN CONST CHAR8 *Format,
-  ...
-)
-{
-  va_list Args;
-
-  va_start (Args, Format);
-  SerialVWriteLine (Format, Args);
-  va_end (Args);
-}
-
-VOID
 SerialLog (
   IN CONST CHAR8 *Format,
   ...

@@ -81,23 +81,6 @@ UefiParseU16List (
 }
 
 BOOLEAN
-UefiU16ListBytes (
-  IN CONST UINT16 *Values,
-  IN UINTN         Count,
-  OUT OABL_BUFFER *Out
-)
-{
-  *Out = (OABL_BUFFER){0};
-  for (UINTN Index = 0; Index < Count; Index++) {
-    if (!BufferAppendLe16 (Out, Values[Index])) {
-      BufferFree (Out);
-      return FALSE;
-    }
-  }
-  return TRUE;
-}
-
-BOOLEAN
 UefiLoadOptionParse (
   IN CONST UINT8       *Bytes,
   IN UINTN              Size,
@@ -140,24 +123,6 @@ UefiLoadOptionParse (
     return FALSE;
   }
   return TRUE;
-}
-
-BOOLEAN
-UefiLoadOptionToBytes (
-  IN CONST UEFI_LOAD_OPTION *Option,
-  OUT OABL_BUFFER           *Out
-)
-{
-  *Out = (OABL_BUFFER){0};
-  if (BufferAppendLe32 (Out, Option->Attributes) &&
-      BufferAppendLe16 (Out, (UINT16)Option->DevicePath.Len) &&
-      PutUtf16z (Out, Option->Description) &&
-      BufferAppend (Out, Option->DevicePath.Data, Option->DevicePath.Len) &&
-      BufferAppend (Out, Option->OptionalData.Data, Option->OptionalData.Len)) {
-    return TRUE;
-  }
-  BufferFree (Out);
-  return FALSE;
 }
 
 VOID
@@ -404,38 +369,6 @@ UefiPathKindName (IN UEFI_PATH_KIND Kind)
   return "?";
 }
 
-BOOLEAN
-UefiSplitFile (
-  IN CONST UINT8  *DevicePath,
-  IN UINTN         Size,
-  OUT OABL_BUFFER *Device,
-  OUT OABL_BUFFER *File
-)
-{
-  UEFI_NODE Node;
-  BOOLEAN   InFile = FALSE;
-
-  *Device = *File = (OABL_BUFFER){0};
-  for (UINTN At = 0; UefiNextNode (DevicePath, Size, &At, &Node);) {
-    if (IsMedia (&Node, UEFI_MEDIA_FILE_PATH)) {
-      InFile = TRUE;
-    }
-    if (!BufferAppend (
-          InFile ? File : Device, Node.Bytes.Ptr, Node.Bytes.Len
-        )) {
-      goto Fail;
-    }
-  }
-  if (BufferAppend (Device, gUefiEndNode, sizeof (gUefiEndNode)) &&
-      BufferAppend (File, gUefiEndNode, sizeof (gUefiEndNode))) {
-    return TRUE;
-  }
-Fail:
-  BufferFree (Device);
-  BufferFree (File);
-  return FALSE;
-}
-
 VOID
 UefiTableHeaderCrc (IN OUT UINT8 *Table)
 {
@@ -498,26 +431,6 @@ UefiVersionPair (IN CONST CHAR8 *Version)
     }
   }
   return (Part[0] & 0xFFFF) << 16 | (Part[1] & 0xFFFF);
-}
-
-BOOLEAN
-UefiParseRtProperties (
-  IN CONST UINT8 *Table,
-  IN UINTN        Size,
-  OUT UINT16     *Version,
-  OUT UINT32     *Supported
-)
-{
-  UINT16 TableVersion;
-  UINT32 Mask;
-
-  if (!GetLe16 (Table, Size, 0, &TableVersion) ||
-      !GetLe32 (Table, Size, 4, &Mask)) {
-    return FALSE;
-  }
-  *Version   = TableVersion;
-  *Supported = Mask;
-  return TRUE;
 }
 
 BOOLEAN

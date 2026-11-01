@@ -17,9 +17,6 @@
 
 #include "Base/Buffer.h"
 
-// IMAGE_FILE_MACHINE_ARM64.
-#define PE_MACHINE_AARCH64 0xAA64
-
 typedef struct _PE_SECTION {
   // Up to 8 Latin-1 characters, stored as UTF-8.
   CHAR8 Name[17];
@@ -44,13 +41,6 @@ BOOLEAN
 PeIsPe (
   IN CONST UINT8 *Head,
   IN UINTN        Size
-);
-
-BOOLEAN
-PeMachine (
-  IN CONST UINT8 *Head,
-  IN UINTN        Size,
-  OUT UINT16     *Machine
 );
 
 // Reads the section table. Head must cover the headers; 4 KiB is enough.

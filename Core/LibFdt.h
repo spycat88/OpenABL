@@ -113,14 +113,6 @@ fdt32_to_cpu (fdt32_t X)
 
 // Error codes. Functions return them negated.
 
-// The requested node or property does not exist.
-#define FDT_ERR_NOTFOUND 1
-// Attempted to create a node or property which already exists.
-#define FDT_ERR_EXISTS 2
-// Operation needed to expand the device tree, but its buffer did not have
-// sufficient space to contain the expanded tree. Use fdt_open_into() to move
-// the device tree to a buffer with more space.
-#define FDT_ERR_NOSPACE 3
 // Function was passed an incomplete device tree created by the
 // sequential-write functions, which is not sufficiently complete for the
 // requested operation.
@@ -144,14 +136,6 @@ fdt_path_offset (
   const char *Path
 );
 
-// Returns the node's name. Lenp gets its length, or the error.
-const char *
-fdt_get_name (
-  const void *Fdt,
-  int         Nodeoffset,
-  int        *Lenp
-);
-
 // Returns the value of property Name. Lenp gets its length, or the error.
 const void *
 fdt_getprop (
@@ -159,53 +143,6 @@ fdt_getprop (
   int         Nodeoffset,
   const char *Name,
   int        *Lenp
-);
-
-// Returns the node after Offset, or the first if Offset is negative. Depth,
-// if not NULL, follows the nesting level.
-int
-fdt_next_node (
-  const void *Fdt,
-  int         Offset,
-  int        *Depth
-);
-
-int
-fdt_first_subnode (
-  const void *Fdt,
-  int         Offset
-);
-
-int
-fdt_next_subnode (
-  const void *Fdt,
-  int         Offset
-);
-
-// Pass Startoffset -1 to search from the start.
-int
-fdt_node_offset_by_compatible (
-  const void *Fdt,
-  int         Startoffset,
-  const char *Compatible
-);
-
-// A new property goes first in the node. The blob grows within totalsize.
-int
-fdt_setprop (
-  void       *Fdt,
-  int         Nodeoffset,
-  const char *Name,
-  const void *Val,
-  int         Len
-);
-
-// Adds an empty subnode after the properties, or returns -FDT_ERR_EXISTS.
-int
-fdt_add_subnode (
-  void       *Fdt,
-  int         Parentoffset,
-  const char *Name
 );
 
 #endif

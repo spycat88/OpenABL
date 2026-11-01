@@ -167,12 +167,6 @@ TextEndsWith (
 );
 
 BOOLEAN
-TextStartsWithNoCase (
-  IN OABL_TEXT    Text,
-  IN CONST CHAR8 *Prefix
-);
-
-BOOLEAN
 TextEndsWithNoCase (
   IN OABL_TEXT    Text,
   IN CONST CHAR8 *Suffix
@@ -245,13 +239,6 @@ BOOLEAN
 TextNextLine (
   IN OUT OABL_TEXT *Rest,
   OUT OABL_TEXT    *Line
-);
-
-// Takes the next whitespace-separated word from Rest.
-BOOLEAN
-TextNextWord (
-  IN OUT OABL_TEXT *Rest,
-  OUT OABL_TEXT    *Word
 );
 
 // Takes the next piece of Rest up to Separator. Empty pieces are kept and

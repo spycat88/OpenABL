@@ -27,49 +27,6 @@
 #include "Core/UsbHostRegs.h"
 #include "Efi/Serial.h"
 
-// 4c7a91e2-5d3b-4f86-b0e9-1a2d6c8f3e57.
-// 4c7a91e2-5d3b-4f86-b0e9-1a2d6c8f3e57.
-#define USB_HOST_PROTOCOL_GUID                                                 \
-  {0x4c7a91e2, 0x5d3b, 0x4f86, {0xb0, 0xe9, 0x1a, 0x2d, 0x6c, 0x8f, 0x3e, 0x57}}
-#define USB_HOST_PROTOCOL_REVISION 0x00010001u
-// Flags bit: host mode is up with a drive enumerated.
-#define USB_HOST_FLAG_UP (1u << 0)
-
-// Lets the ABL control USB host after the bring-up, while the menu stays
-// loaded. No ABL header mirrors it, as the ABL no longer calls it.
-typedef struct _USB_HOST_PROTOCOL {
-  UINT32 Revision;
-  UINT32 Flags;
-  // Nothing booted: back to device mode, VBUS off.
-  VOID (EFIAPI *Teardown) (IN struct _USB_HOST_PROTOCOL *This);
-  // Before a power-off.
-  VOID (EFIAPI *ReleaseVbus) (IN struct _USB_HOST_PROTOCOL *This);
-  // Before the OS starts (also done at ExitBootServices).
-  VOID (EFIAPI *OsHandoff) (IN struct _USB_HOST_PROTOCOL *This);
-  // 1.1: brings host mode up again after a teardown, with the GPT quirk
-  // before and the FAT quirk after. Log may be NULL. EFI_SUCCESS with a
-  // drive up, EFI_NOT_FOUND without, EFI_NOT_READY before any bring-up.
-  EFI_STATUS (EFIAPI *BringUp) (
-    IN struct _USB_HOST_PROTOCOL *This,
-    IN OPENABL_STORAGE_LOG        Log OPTIONAL
-  );
-} USB_HOST_PROTOCOL;
-
-_Static_assert (
-  offsetof (
-    USB_HOST_PROTOCOL,
-    OsHandoff
-  ) == 0x18,
-  "USB_HOST_PROTOCOL: the ABL's layout"
-);
-_Static_assert (
-  offsetof (
-    USB_HOST_PROTOCOL,
-    BringUp
-  ) == 0x20,
-  "USB_HOST_PROTOCOL: the ABL's layout"
-);
-
 typedef struct _USB_HOST_OUTCOME {
   // A USB drive is enumerated and its filesystems are present.
   BOOLEAN Up;
@@ -105,18 +62,9 @@ UsbHostReleaseVbus (VOID);
 BOOLEAN
 UsbHostIsUp (VOID);
 
-// Shuts down the ADSP the bring-up loaded, before the OS loads its own.
-VOID
-UsbHostOsHandoff (VOID);
-
 // Undoes a bring up before a restart or power-off. The ADSP is left for the
 // reset to stop.
 VOID
 UsbHostBeforeReset (VOID);
-
-// Installs the protocol for the ABL on a new handle, once; later calls only
-// update its flags. It is never freed, so the menu must stay loaded.
-EFI_STATUS
-UsbHostInstallProtocol (VOID);
 
 #endif

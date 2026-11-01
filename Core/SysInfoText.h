@@ -14,18 +14,6 @@
 
 #include "Base/Text.h"
 
-// Each field is NULL or allocated with AllocatePool.
-typedef struct _SYSINFO {
-  CHAR8 *Soc;
-  CHAR8 *Ram;
-  CHAR8 *Storage;
-  CHAR8 *SdCard;
-  CHAR8 *Firmware;
-} SYS_INFO;
-
-VOID
-SysInfoFree (IN OUT SYS_INFO *Info);
-
 // Formats a size as "12 GB", "1.5 GB" or "512 MB", in binary units.
 CHAR8 *
 SysInfoFormatBytes (IN UINT64 Bytes);

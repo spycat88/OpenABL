@@ -51,21 +51,6 @@ BufferAppendLe32 (
   IN OUT OABL_BUFFER *Buffer,
   IN UINT32           Value
 );
-BOOLEAN
-BufferAppendLe64 (
-  IN OUT OABL_BUFFER *Buffer,
-  IN UINT64           Value
-);
-BOOLEAN
-BufferAppendBe32 (
-  IN OUT OABL_BUFFER *Buffer,
-  IN UINT32           Value
-);
-BOOLEAN
-BufferAppendBe64 (
-  IN OUT OABL_BUFFER *Buffer,
-  IN UINT64           Value
-);
 
 BOOLEAN
 BufferAppendZeros (
@@ -80,18 +65,6 @@ BufferFrom (
   IN UINTN         Length
 );
 
-// Never makes the buffer longer.
-STATIC inline VOID
-BufferTruncate (
-  IN OUT OABL_BUFFER *Buffer,
-  IN UINTN            Length
-)
-{
-  if (Length < Buffer->Len) {
-    Buffer->Len = Length;
-  }
-}
-
 VOID
 BufferFree (IN OUT OABL_BUFFER *Buffer);
 
@@ -100,13 +73,6 @@ BufferBytes (IN CONST OABL_BUFFER *Buffer)
 {
   return (OABL_BYTES){Buffer->Data, Buffer->Len};
 }
-
-// Returns the bytes and empties the buffer. Caller frees the result.
-UINT8 *
-BufferTake (
-  IN OUT OABL_BUFFER *Buffer,
-  OUT UINTN          *Length OPTIONAL
-);
 
 // Arrays of any type
 
@@ -140,36 +106,6 @@ VecGrow (
     sizeof (*(Vec)->Items)                                                     \
   )
 
-// Removes element Index and shifts the rest down. Ignores Index past the end.
-#define VecRemove(Vec, Index)                                                  \
-  VecRemoveRaw ((Vec)->Items, &(Vec)->Count, (Index), sizeof (*(Vec)->Items))
-VOID
-VecRemoveRaw (
-  IN OUT VOID  *Items,
-  IN OUT UINTN *Count,
-  IN UINTN      Index,
-  IN UINTN      Size
-);
-
-// Inserts an element at Index, or at the end if Index is past it.
-#define VecInsert(Vec, Index, ...)                                             \
-  (VecReserve (Vec, 1)                                                         \
-     ? ((Vec)->Items[VecOpenRaw (                                              \
-          (Vec)->Items, &(Vec)->Count, (Index), sizeof (*(Vec)->Items)         \
-        )] = (__VA_ARGS__),                                                    \
-        TRUE)                                                                  \
-     : FALSE)
-
-// Opens a one-element gap at Index (or at the end), counts it and returns
-// its position.
-UINTN
-VecOpenRaw (
-  IN OUT VOID  *Items,
-  IN OUT UINTN *Count,
-  IN UINTN      Index,
-  IN UINTN      Size
-);
-
 // Frees the array, but not what its elements point to.
 #define VecFree(Vec)                                                           \
   ((VOID)(VecFreeRaw ((VOID **)&(Vec)->Items), (Vec)->Count = (Vec)->Cap = 0))
@@ -195,12 +131,6 @@ STATIC inline UINT64
 ReadLe64 (IN CONST UINT8 *Bytes)
 {
   return (UINT64)ReadLe32 (Bytes) | (UINT64)ReadLe32 (Bytes + 4) << 32;
-}
-
-STATIC inline UINT16
-ReadBe16 (IN CONST UINT8 *Bytes)
-{
-  return (UINT16)(Bytes[0] << 8 | Bytes[1]);
 }
 
 STATIC inline UINT32
@@ -275,25 +205,11 @@ GetLe32 (
   OUT UINT32     *Value
 );
 BOOLEAN
-GetLe64 (
-  IN CONST UINT8 *Bytes,
-  IN UINTN        Size,
-  IN UINTN        At,
-  OUT UINT64     *Value
-);
-BOOLEAN
 GetBe32 (
   IN CONST UINT8 *Bytes,
   IN UINTN        Size,
   IN UINTN        At,
   OUT UINT32     *Value
-);
-BOOLEAN
-GetBe64 (
-  IN CONST UINT8 *Bytes,
-  IN UINTN        Size,
-  IN UINTN        At,
-  OUT UINT64     *Value
 );
 
 // Checks At + Length <= Size without overflowing.

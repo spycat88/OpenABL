@@ -1950,22 +1950,6 @@ PutScaled (
 }
 
 BOOLEAN
-SysFontScaled (
-  IN UINT8         Scale,
-  OUT OABL_BUFFER *Out
-)
-{
-  OABL_BUFFER B = {0};
-
-  if (!PutScaled (&B, Scale)) {
-    BufferFree (&B);
-    return FALSE;
-  }
-  *Out = B;
-  return TRUE;
-}
-
-BOOLEAN
 SysFontPackageList (
   IN UINT8         Scale,
   OUT OABL_BUFFER *Out

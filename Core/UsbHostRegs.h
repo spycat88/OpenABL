@@ -208,30 +208,4 @@ UsbHostConnected (IN USB_HOST_PORTSC Ports);
 // Connect all controllers this often.
 #define USB_HOST_WAIT_CONNECT_EVERY 1500u
 
-// Formats Value as "0x%llx" in new memory. Caller frees it.
-CHAR8 *
-UsbHostHex (IN UINT64 Value);
-
-// Formats Value as "%llu" in new memory. Caller frees it.
-CHAR8 *
-UsbHostDec (IN UINT64 Value);
-
-// Buffer size for either format of any value, including the NUL.
-#define USB_HOST_NUM_SIZE 21
-
-// Formats into Out, truncated to Size. Returns Out for use as an argument.
-CHAR8 *
-UsbHostHexBuf (
-  OUT CHAR8 *Out,
-  IN UINTN   Size,
-  IN UINT64  Value
-);
-
-CHAR8 *
-UsbHostDecBuf (
-  OUT CHAR8 *Out,
-  IN UINTN   Size,
-  IN UINT64  Value
-);
-
 #endif

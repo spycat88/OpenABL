@@ -538,6 +538,3 @@ BootManagerSetBootCurrent (
     DeleteVariable ("BootCurrent", &gEfiGlobalVariableGuid);
   }
 }
-
-// EFI_OS_INDICATIONS_BOOT_TO_FW_UI. Our menu is the firmware setup screen.
-#define BOOT_TO_FW_UI ((UINT64)1)

@@ -4,20 +4,18 @@
  */
 
 /**
-  DeviceTree - devicetree inspection and in-place editing.
+  DeviceTree - devicetree inspection.
 
   DtInspect walks the blob itself with bounds-checked reads, since blobs
   come off SD cards. The rest uses the ABL's libfdt (Core/LibFdt.h), which
-  trusts its input, so every call validates the blob first and leaves a bad
-  one untouched: edits return DT_BAD_BLOB and lookups find nothing.
+  trusts its input, so every call validates the blob first and a bad one
+  finds nothing.
 
-  Nodes are libfdt offsets. Edits grow the blob within its totalsize, which
-  must fit in Capacity, and set a header version above 17 to 17. Paths must
-  be absolute, as libfdt reads one without the leading '/' as an alias.
+  Nodes are libfdt offsets. Paths must be absolute, as libfdt reads one
+  without the leading '/' as an alias.
 
   Trees not built by dtc follow libfdt's assumptions: a node's properties
-  come before its subnodes, edits need the memory reservation map before the
-  structure block, and a last_comp_version above 17 is refused.
+  come before its subnodes, and a last_comp_version above 17 is refused.
 */
 
 #ifndef __CORE_DEVICE_TREE_H__
@@ -66,16 +64,6 @@ DtFindAll (
   OUT DT_BLOBS   *Found
 );
 
-// libfdt's -FDT_ERR_NOSPACE becomes DT_NO_SPACE, other errors DT_BAD_BLOB.
-typedef enum {
-  DT_OK,
-  // Can't be edited, or the subnode exists already (-FDT_ERR_EXISTS).
-  DT_BAD_BLOB,
-  DT_NOT_FOUND,
-  // The property doesn't fit within the blob's totalsize, or out of memory.
-  DT_NO_SPACE,
-} DT_ERROR;
-
 // Finds the node at Path with fdt_path_offset. A component without a unit
 // address matches a node with one: /reserved-memory/cont_splash_region finds
 // cont_splash_region@9c000000.
@@ -87,15 +75,6 @@ DtNodeAtPath (
   OUT UINTN      *Node
 );
 
-// Name points into the blob.
-BOOLEAN
-DtNodeName (
-  IN CONST UINT8 *Fdt,
-  IN UINTN        Size,
-  IN UINTN        Node,
-  OUT OABL_BYTES *Name
-);
-
 // Value points into the blob.
 BOOLEAN
 DtPropAt (
@@ -104,53 +83,6 @@ DtPropAt (
   IN UINTN        Node,
   IN CONST CHAR8 *Name,
   OUT OABL_BYTES *Value
-);
-
-typedef struct _DT_NODES
-OABL_VEC (UINTN) DT_NODES;
-
-// Adds an empty subnode after Parent's properties and before its subnodes.
-// Returns DT_BAD_BLOB if Parent already has a subnode of that name.
-DT_ERROR
-DtAddSubnode (
-  IN OUT UINT8   *Fdt,
-  IN UINTN        Capacity,
-  IN UINTN        Parent,
-  IN CONST CHAR8 *Name,
-  OUT UINTN      *Node
-);
-
-// Returns TRUE if /chosen has a subnode whose name starts with Prefix. It
-// doesn't allocate, so it can be called at ExitBootServices.
-BOOLEAN
-DtChosenHas (
-  IN CONST UINT8 *Fdt,
-  IN UINTN        Size,
-  IN CONST CHAR8 *Prefix
-);
-
-// Lists the direct subnodes of Node. On failure, Out keeps those found so
-// far.
-BOOLEAN
-DtNodeChildren (
-  IN CONST UINT8 *Fdt,
-  IN UINTN        Size,
-  IN UINTN        Node,
-  OUT DT_NODES   *Out
-);
-
-// Adds a no-map Prefix@BASE node to /reserved-memory, creating it if
-// needed, unless a region there already covers the range. This keeps the
-// kernel off the scanned-out memory when it takes its memory layout from the
-// devicetree. Under EFI the firmware memory map already reserves it.
-DT_ERROR
-DtReserveMemoryNamed (
-  IN OUT UINT8   *Fdt,
-  IN UINTN        Capacity,
-  IN CONST CHAR8 *Prefix,
-  IN UINT64       Base,
-  IN UINT64       Size,
-  OUT BOOLEAN    *Added
 );
 
 #endif
