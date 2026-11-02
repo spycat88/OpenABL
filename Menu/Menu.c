@@ -1547,7 +1547,7 @@ RunMenu (
     }
     AppStartEntries (&mApp, ClockNowMs (), TimeoutS);
   } else {
-    AppStart (&mApp, ClockNowMs ());
+    mApp.Now = ClockNowMs ();
   }
   {
     BOOLEAN    Ok;

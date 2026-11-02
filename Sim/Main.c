@@ -273,7 +273,7 @@ SLongValues (
   SampleInfo (&Info);
   AsciiStrCopy (Info.Soc, sizeof (Info.Soc), "Dragonwing QCS8550");
   AppInit (A, &Settings, &Caps, &Info, SCHEME_HANDHELD, MENU_VERSION);
-  AppStart (A, Now);
+  A->Now = Now;
 }
 
 STATIC VOID
@@ -525,7 +525,7 @@ Render (
   AsciiStrCopy (Settings.Model, sizeof (Settings.Model), "Retroid Pocket 5");
   Settings.ModelRotation = 270;
   MakeApp (&mApp, &Settings);
-  AppStart (&mApp, Now);
+  mApp.Now = Now;
   mScreens[Screen].Setup (&mApp, Now);
   AppSetPhysicalSize (&mApp, (UINT32)PanelW, (UINT32)PanelH);
 
@@ -898,7 +898,7 @@ Check (
   SettingsDefault (&Settings);
   Settings.Rotation = (UINT16)Degrees;
   MakeApp (&mApp, &Settings);
-  AppStart (&mApp, Now);
+  mApp.Now = Now;
   AppSetPhysicalSize (&mApp, (UINT32)PanelW, (UINT32)PanelH);
   mPw              = PanelW;
   UINTN PixelCount = (UINTN)PanelW * PanelH;

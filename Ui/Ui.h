@@ -312,13 +312,6 @@ AppInit (
   IN CONST CHAR8         *Version
 );
 
-// Opens the menu at power-on.
-VOID
-AppStart (
-  IN OUT APP *A,
-  IN UINT64   Now
-);
-
 // Opens Boot entries before a boot, with the default first. With TimeoutS
 // it counts down to booting the default; with 0 it waits for a pick.
 VOID

@@ -200,16 +200,6 @@ BeginBoot (IN OUT APP *A)
 }
 
 VOID
-AppStart (
-  IN OUT APP *A,
-  IN UINT64   Now
-)
-{
-  A->Now   = Now;
-  A->Dirty = TRUE;
-}
-
-VOID
 AppStartEntries (
   IN OUT APP *A,
   IN UINT64   Now,
