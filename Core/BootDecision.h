@@ -109,7 +109,7 @@ BootSourceAllows (
 
 // Fills Order (room for Count) with the indices of the drives that
 // BootSourceAllows accepts and returns how many. Source is the stored
-// setting. In Auto, without the Volume Up override, internal drives go first.
+// setting. In Auto, without the Volume Up override, external drives go first.
 UINTN
 BootSourceSelect (
   IN BOOT_SOURCE               Source,

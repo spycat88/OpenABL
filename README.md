@@ -53,7 +53,7 @@ In the menu, Volume Up and Down move the selection and Power selects.
 | Boot mode | Linux or Android. |
 | ABL mode | Silent, or Verbose to show the ABL's log on screen while booting. |
 | Volume up at boot | Sets what holding Volume Up at power-on does. |
-| Boot source | Auto (internal storage first), Internal, SD card or USB. |
+| Boot source | Auto (SD card first, then internal storage), Internal, SD card or USB. |
 | Off-mode charging | Shows the charger screen when plugged in while powered off. |
 | Display rotation | Auto (from the device model) or fixed at 0, 90, 180 or 270 degrees. |
 | Custom boot logo | Replaces the manufacturer's logo at boot with the pictures in a `\logo` folder (see below), or the OpenABL wordmark if there are none. Off by default. |
