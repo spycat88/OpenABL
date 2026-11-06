@@ -85,6 +85,17 @@ HostBeforeStart (
 }
 
 STATIC VOID
+HostNoDevicetree (
+  IN CONST BOOT_HOST *Host,
+  IN EFI_HANDLE       Fs
+)
+{
+  if (Host->NoDevicetree) {
+    Host->NoDevicetree (Host->Context, Fs);
+  }
+}
+
+STATIC VOID
 HostAfterReturn (IN CONST BOOT_HOST *Host)
 {
   if (Host->AfterReturn) {
@@ -672,6 +683,13 @@ StartEntry (
   // Look for the entry's own devicetree first, so the platform doesn't
   // install the model's only to have it replaced.
   Own = OwnDevicetree (Fs, &Entry.Action, &Dtb);
+  // A BLS entry file with a kernel and no devicetree line. A UKI may carry
+  // its own, and a devicetree line that fails to load already said which.
+  if (Entry.Source == BOOT_ENTRY_SOURCE_TYPE1 &&
+      Entry.Action.Kind == BOOT_ENTRY_ACTION_LINUX &&
+      !Entry.Action.Devicetree) {
+    HostNoDevicetree (Host, Fs);
+  }
   HostBeforeStart (Host, Fs, Own);
   HasDtb  = Own || ModelDevicetreeFor (Host, Fs, &Entry.Action, &Dtb);
   Outcome = Run (Host, Image, HasDtb ? &Dtb : NULL, Entry.Title);

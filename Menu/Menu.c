@@ -119,6 +119,8 @@ typedef struct _MENU_STATE {
   // restart. OpenMenu is set when Back asked for the menu instead.
   BOOLEAN BootPicker;
   BOOLEAN OpenMenu;
+  // The model list before a boot: a pick or Back goes on with the boot.
+  BOOLEAN ModelPicker;
   // For the device info screen.
   CHAR8 AblVersion[64];
   UINTN DisplayW, DisplayH;
@@ -860,7 +862,8 @@ RunCommand (
     }
 #endif
     // Before a boot, the boot goes on as soon as the menu leaves.
-    if (M->BootPicker || (StartsHere (M) && MayStartHere (M))) {
+    if (M->BootPicker || M->ModelPicker ||
+        (StartsHere (M) && MayStartHere (M))) {
       // Shut down as when the ABL asks the menu to leave.
       return TRUE;
     }
@@ -888,6 +891,14 @@ RunCommand (
 #endif
     if (Failure) {
       AppOnFailed (&mApp, Failure);
+    }
+    // The model list before a boot saves its pick, and the boot goes on,
+    // with no model if the save failed.
+    if (M->ModelPicker) {
+      if (Failure) {
+        MenuLog ("the model picked before the boot wasn't saved: %s", Failure);
+      }
+      return TRUE;
     }
     break;
   }
@@ -1093,13 +1104,15 @@ NextPending (IN OUT PENDING_COMMANDS *Pending)
 }
 
 // Runs the menu, or with BootPicker only Boot entries before a boot,
-// counting down TimeoutS (0 for none) to the default.
+// counting down TimeoutS (0 for none) to the default, or with ModelPicker
+// only the model list before a boot.
 STATIC MENU_END
 RunMenu (
   IN CONST MENU_HOST *Host,
   IN BOOLEAN          StartModels,
   IN UINT8            CameBack,
   IN BOOLEAN          BootPicker,
+  IN BOOLEAN          ModelPicker,
   IN UINT32           TimeoutS
 )
 {
@@ -1122,8 +1135,9 @@ RunMenu (
     MenuLog ("reading the ABL's state failed: %s", MENU_STATUS (Status));
     return (MENU_END){MENU_END_FAILED, Status};
   }
-  M.BootPicker = BootPicker;
-  if (!BootPicker && M.CameBack == MENU_START_RESULT_NO_USB) {
+  M.BootPicker  = BootPicker;
+  M.ModelPicker = ModelPicker;
+  if (!BootPicker && !ModelPicker && M.CameBack == MENU_START_RESULT_NO_USB) {
     // USB host didn't come up (no drive, or XBL kept the core). Restart, so
     // the next boot brings it up before fastboot.
     MenuLog (
@@ -1180,17 +1194,19 @@ RunMenu (
       return (MENU_END){MENU_END_START_HERE, EFI_SUCCESS};
     }
     AppStartEntries (&mApp, ClockNowMs (), TimeoutS);
+  } else if (ModelPicker) {
+    Pend (&Pending, AppStartModelPicker (&mApp, ClockNowMs ()));
   } else {
     AppStart (&mApp, ClockNowMs ());
   }
   {
     BOOLEAN    Ok;
     BOOT_ERROR Error;
-    if (!BootPicker && CameBackShown (&M, &Ok, &Error)) {
+    if (!BootPicker && !ModelPicker && CameBackShown (&M, &Ok, &Error)) {
       AppOnBootResult (&mApp, Ok, Error, NULL);
     }
   }
-  if (StartModels) {
+  if (StartModels && !ModelPicker) {
     Pend (&Pending, AppOpenModels (&mApp));
   }
   Rotation = AppDesiredRotation (&mApp);
@@ -1278,7 +1294,7 @@ MenuRun (
   IN UINT8            CameBack
 )
 {
-  return RunMenu (Host, StartModels, CameBack, FALSE, 0);
+  return RunMenu (Host, StartModels, CameBack, FALSE, FALSE, 0);
 }
 
 MENU_END
@@ -1287,5 +1303,13 @@ MenuRunEntries (
   IN UINT32           TimeoutS
 )
 {
-  return RunMenu (Host, FALSE, MENU_START_RESULT_NONE, TRUE, TimeoutS);
+  return RunMenu (Host, FALSE, MENU_START_RESULT_NONE, TRUE, FALSE, TimeoutS);
+}
+
+MENU_END
+MenuRunModels (IN CONST MENU_HOST *Host)
+{
+  // StartModels: USB host is already up for the boot, so the USB boot
+  // source can be scanned without a restart.
+  return RunMenu (Host, TRUE, MENU_START_RESULT_NONE, FALSE, TRUE, 0);
 }

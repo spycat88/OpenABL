@@ -229,6 +229,17 @@ AppOpenModels (IN OUT APP *A)
 }
 
 COMMAND
+AppStartModelPicker (
+  IN OUT APP *A,
+  IN UINT64   Now
+)
+{
+  A->Now         = Now;
+  A->ModelPicker = TRUE;
+  return AppOpenModels (A);
+}
+
+COMMAND
 AppTick (
   IN OUT APP *A,
   IN UINT64   Now
@@ -962,6 +973,18 @@ LeaveModels (IN OUT APP *A)
   A->FocusItem = ITEM_MODEL;
 }
 
+// Back from the model list. Before a boot there is no menu here, so the
+// boot goes on without a model.
+STATIC COMMAND
+BackFromModels (IN OUT APP *A)
+{
+  if (A->ModelPicker) {
+    return Command (COMMAND_BOOT, 0);
+  }
+  LeaveModels (A);
+  return None ();
+}
+
 STATIC COMMAND
 ModelsInput (
   IN OUT APP *A,
@@ -980,8 +1003,7 @@ ModelsInput (
     A->ModelList.Focus = (Focus + 1) % Count;
     break;
   case INPUT_BACK:
-    LeaveModels (A);
-    break;
+    return BackFromModels (A);
   case INPUT_SELECT:
     if (Focus == 0) {
       // No model, so the OS gets the firmware's devicetree untouched.
@@ -1005,8 +1027,7 @@ ModelsInput (
       ShowToast (A, Message);
       return Command (COMMAND_SAVE_SETTINGS, 0);
     }
-    LeaveModels (A);
-    break;
+    return BackFromModels (A);
   }
   return None ();
 }

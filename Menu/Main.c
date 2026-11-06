@@ -24,6 +24,7 @@
 #include "Efi/DisplayHandover.h"
 #include "Efi/Handover.h"
 #include "Efi/Input.h"
+#include "Efi/Models.h"
 #include "Efi/Qcom.h"
 #include "Efi/Quirks.h"
 #include "Efi/UsbHost.h"
@@ -232,6 +233,51 @@ StdModelCompatible (IN VOID *Context)
   return Compatible;
 }
 
+// A BLS entry with no devicetree line, and no model set: if the entry's
+// drive has devicetrees, shows the model list before the boot, so the
+// model's devicetree is installed in BeforeStart. The pick is saved, and
+// the boot goes on with it, or with none after "Firmware default" or Back.
+// Context is the caller's MENU_BOOT_CONTEXT, which is writable.
+STATIC VOID
+StdNoDevicetree (
+  IN VOID      *Context,
+  IN EFI_HANDLE Fs
+)
+{
+  MENU_BOOT_CONTEXT *Ctx   = Context;
+  SCANNED_MODELS     Found = {0};
+  MENU_BOOT_CONTEXT  Now;
+  MENU_END           End;
+  UINTN              Count;
+
+  if (Ctx->Model[0]) {
+    return;
+  }
+  ModelsScan (&Fs, 1, gMenuEfiLog, &Found);
+  Count = Found.Count;
+  ModelsFree (&Found);
+  if (!Count) {
+    MenuLog ("no devicetree in the entry, no model set and none on the drive");
+    return;
+  }
+  MenuLog (
+    "no devicetree in the entry and no model set: the model list (%llu on "
+    "the drive)",
+    (UINT64)Count
+  );
+  AblConsoleHold (TRUE);
+  End = MenuRunModels (Ctx->Host);
+  AblConsoleHold (FALSE);
+  if (End.Kind == MENU_END_FAILED) {
+    MenuLog ("the model list couldn't run (%s)", MENU_STATUS (End.Status));
+  }
+  if (BootContextOf (Ctx->Host, &Now)) {
+    AsciiStrCopy (Ctx->Model, sizeof (Ctx->Model), Now.Model);
+    Ctx->ModelRotation = Now.ModelRotation;
+  }
+  MenuLog ("booting with model %s", Ctx->Model[0] ? Ctx->Model : "(none)");
+}
+
 STATIC VOID
 StdBeforeStart (
   IN VOID      *Context,
@@ -261,6 +307,7 @@ StandardBoot (
     .Context         = (VOID *)Ctx,
     .ModelDevicetree = StdModelDevicetree,
     .ModelCompatible = StdModelCompatible,
+    .NoDevicetree    = StdNoDevicetree,
     .BeforeStart     = StdBeforeStart,
     .AfterReturn     = ReturnedToMenu,
   };

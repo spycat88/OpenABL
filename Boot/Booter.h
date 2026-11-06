@@ -36,6 +36,13 @@ typedef struct _BOOT_HOST {
   // Returns the selected model's compatible for extlinux FDTDIR, or NULL.
   // The booter frees it. Defaults to BootHostDefaultModelCompatible.
   CHAR8 *(*ModelCompatible) (IN VOID *Context);
+  // Called for a Boot Loader Specification entry file with a kernel and no
+  // devicetree line, once its image is loaded and just before BeforeStart,
+  // so the platform can ask for a model. Fs is its drive.
+  VOID (*NoDevicetree) (
+    IN VOID      *Context,
+    IN EFI_HANDLE Fs
+  );
   // Called once an image is loaded and its options are set, just before it
   // starts. Fs is its drive, or NULL. OwnDevicetree is TRUE when the entry
   // brings a devicetree, installed after this call, so the platform need

@@ -96,6 +96,12 @@ MenuRunEntries (
   IN UINT32           TimeoutS
 );
 
+// Shows only the model list before a boot, without fastboot. A pick is
+// saved; a pick, "Firmware default" or Back returns MENU_END_START_HERE,
+// and the boot goes on with whatever model is now stored.
+MENU_END
+MenuRunModels (IN CONST MENU_HOST *Host);
+
 // Brings USB host up for the menu, pausing fastboot's gadget. If no drive
 // comes up, undoes that and returns EFI_NOT_FOUND.
 EFI_STATUS

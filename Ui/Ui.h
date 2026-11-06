@@ -292,6 +292,9 @@ typedef struct _APP {
   // Boot entries shown before a boot, with no menu behind it. Back asks
   // for the menu.
   BOOLEAN BootPicker;
+  // The model list shown before a boot, with no menu behind it. Picking a
+  // row or Back goes on with the boot.
+  BOOLEAN ModelPicker;
   // Clock in milliseconds, from the last call that passed it.
   UINT64 Now;
   // Set when the state changes. ViewSync clears it.
@@ -344,6 +347,13 @@ AppInput (
 
 COMMAND
 AppOpenModels (IN OUT APP *A);
+
+// Opens the model list before a boot. Returns the scan command.
+COMMAND
+AppStartModelPicker (
+  IN OUT APP *A,
+  IN UINT64   Now
+);
 
 VOID
 AppSetSettings (
