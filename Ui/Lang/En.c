@@ -44,6 +44,7 @@ CONST LANG_STRINGS gLangEn = {
   .Off               = "Off",
   .Rotation          = "Display rotation",
   .CustomLogo        = "Custom boot logo",
+  .SystemStats       = "System stats",
   .RotationAuto      = "Auto ({}°)",
   .DeviceModel       = "Device model",
   .NotSet            = "Not set",

@@ -542,6 +542,7 @@ AppRows (
   ADD_ITEM (ITEM_CHARGING);
   ADD_ITEM (ITEM_ROTATION);
   ADD_ITEM (ITEM_CUSTOM_LOGO);
+  ADD_ITEM (ITEM_SYSTEM_STATS);
   if (SettingsModelVisible (Settings)) {
     ADD_ITEM (ITEM_MODEL);
   }
@@ -739,6 +740,13 @@ AppItemView (
       Value, Cap, Settings->CustomLogo ? gStrings->On : gStrings->Off
     );
     break;
+  case ITEM_SYSTEM_STATS:
+    View->Icon  = ICON_CPU;
+    View->Label = gStrings->SystemStats;
+    AsciiStrCopy (
+      Value, Cap, Settings->SystemStats ? gStrings->On : gStrings->Off
+    );
+    break;
   case ITEM_MODEL:
     View->Icon  = ICON_GAMEPAD;
     View->Label = gStrings->DeviceModel;
@@ -839,6 +847,9 @@ Activate (
     return Command (COMMAND_SAVE_SETTINGS, 0);
   case ITEM_CUSTOM_LOGO:
     Settings->CustomLogo = !Settings->CustomLogo;
+    return Command (COMMAND_SAVE_SETTINGS, 0);
+  case ITEM_SYSTEM_STATS:
+    Settings->SystemStats = !Settings->SystemStats;
     return Command (COMMAND_SAVE_SETTINGS, 0);
   case ITEM_MODEL:
     A->Screen = SCREEN_SCANNING;

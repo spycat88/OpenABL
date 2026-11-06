@@ -66,6 +66,7 @@ SettingsDefault (OUT SETTINGS *Settings)
     .BootSource    = BOOT_SOURCE_AUTO,
     .Rotation      = ROTATION_AUTO,
     .ModelRotation = ROTATION_NONE,
+    .SystemStats   = TRUE,
     .Language      = LanguageEnglish (),
   };
 }
@@ -488,6 +489,7 @@ STATIC CONST STORED_SETTING mStoredSettings[] = {
   OTHER_SETTING (MODEL_ROTATION_FOR, FORMAT_MODEL_ROTATION_FOR),
   OTHER_SETTING (MODEL_ROTATION, FORMAT_MODEL_ROTATION),
   BYTE_SETTING (CUSTOM_LOGO, CustomLogo, 1),
+  BYTE_SETTING (SYSTEM_STATS, SystemStats, 1),
   OTHER_SETTING (LANGUAGE, FORMAT_LANGUAGE),
   BYTE_SETTING (DEVELOPER_OPTIONS, DeveloperOptions, 1),
   BYTE_SETTING (USB_HOST_LIVE, UsbHostLive, 1),

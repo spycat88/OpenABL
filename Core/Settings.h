@@ -74,6 +74,9 @@ typedef struct _SETTINGS {
   // Draw OpenABL's boot splash (the card's /logo/ pictures, or the
   // wordmark). Off keeps the manufacturer's logo up.
   BOOLEAN CustomLogo;
+  // Show the system stats card (SoC, RAM, storage, ...) beside the menu.
+  // Off gives the list the whole screen.
+  BOOLEAN SystemStats;
   // The menu's language, a LANG_ID from Ui/Lang.h. Stored as its Symbol.
   UINT8 Language;
 
@@ -111,6 +114,7 @@ typedef struct _SETTINGS {
 #define SETTINGS_KEY_MODEL_ROTATION     "DeviceModelRotation"
 #define SETTINGS_KEY_MODEL_ROTATION_FOR "DeviceModelRotationFor"
 #define SETTINGS_KEY_CUSTOM_LOGO        "CustomLogo"
+#define SETTINGS_KEY_SYSTEM_STATS       "SystemStats"
 #define SETTINGS_KEY_LANGUAGE           "MenuLanguage"
 #define SETTINGS_KEY_DEVELOPER_OPTIONS  "DeveloperOptions"
 #define SETTINGS_KEY_USB_HOST_LIVE      "UsbHostLive"

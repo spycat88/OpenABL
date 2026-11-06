@@ -1177,7 +1177,8 @@ Countdown (
 }
 
 // The menu or the developer options, with the info card beside the list
-// (landscape) or above it (portrait).
+// (landscape) or above it (portrait). With System stats off, the list takes
+// the whole body.
 STATIC VOID
 MenuDraw (IN OUT APP *A)
 {
@@ -1194,7 +1195,10 @@ MenuDraw (IN OUT APP *A)
   RECT        Card;
   LIST        List;
 
-  if (mView.W > mView.H) {
+  if (!A->Settings.SystemStats) {
+    Area = Body;
+    Card = Body;
+  } else if (mView.W > mView.H) {
     INT32 Gap = ToPxInt (14);
     RECT  LeftPart;
     RECT  RightPart;
@@ -1239,6 +1243,9 @@ MenuDraw (IN OUT APP *A)
     }
   }
   ListChevrons (&List);
+  if (!A->Settings.SystemStats) {
+    return;
+  }
   if (mView.W > mView.H) {
     InfoWide (A, Card);
   } else {
