@@ -41,6 +41,7 @@ CONST LANG_STRINGS gLangZhHans = {
   .Off                   = "关",
   .Rotation              = "屏幕旋转",
   .CustomLogo            = "自定义启动徽标",
+  .Theme                 = "主题",
   .RotationAuto          = "自动（{}°）",
   .DeviceModel           = "设备型号",
   .NotSet                = "未设置",

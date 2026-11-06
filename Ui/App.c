@@ -12,6 +12,7 @@
 #include "Core/Settings.h"
 #include "Ui/DeveloperOptions.h"
 #include "Ui/Lang.h"
+#include "Ui/Theme.h"
 #include "Ui/Ui.h"
 
 // How long a toast shows, in milliseconds.
@@ -541,6 +542,7 @@ AppRows (
   }
   ADD_ITEM (ITEM_CHARGING);
   ADD_ITEM (ITEM_ROTATION);
+  ADD_ITEM (ITEM_THEME);
   ADD_ITEM (ITEM_CUSTOM_LOGO);
   if (SettingsModelVisible (Settings)) {
     ADD_ITEM (ITEM_MODEL);
@@ -732,6 +734,11 @@ AppItemView (
     View->Label = gStrings->Rotation;
     RotationLabel (A, Value, Cap);
     break;
+  case ITEM_THEME:
+    View->Icon  = ICON_PALETTE;
+    View->Label = gStrings->Theme;
+    AsciiStrCopy (Value, Cap, ThemeGet (Settings->Theme)->Name);
+    break;
   case ITEM_CUSTOM_LOGO:
     View->Icon  = ICON_PHOTO;
     View->Label = gStrings->CustomLogo;
@@ -836,6 +843,9 @@ Activate (
     return Command (COMMAND_SAVE_SETTINGS, 0);
   case ITEM_ROTATION:
     SettingsNextRotation (Settings);
+    return Command (COMMAND_SAVE_SETTINGS, 0);
+  case ITEM_THEME:
+    SettingsNextTheme (Settings);
     return Command (COMMAND_SAVE_SETTINGS, 0);
   case ITEM_CUSTOM_LOGO:
     Settings->CustomLogo = !Settings->CustomLogo;

@@ -19,6 +19,7 @@
 
 #include "Base/Buffer.h"
 #include "Ui/Lang/Languages.h"
+#include "Ui/Theme/Themes.h"
 
 typedef enum { BOOT_MODE_LINUX, BOOT_MODE_ANDROID } BOOT_MODE;
 
@@ -42,6 +43,10 @@ typedef enum {
 // Languages the menu offers (LANG_COUNT), counted from Ui/Lang/Languages.h.
 #define SETTINGS_LANGUAGE_ONE(Id, Symbol) +1
 #define SETTINGS_LANGUAGES                (0 LANG_LIST (SETTINGS_LANGUAGE_ONE))
+
+// Themes the menu offers (THEME_COUNT), counted from Ui/Theme/Themes.h.
+#define SETTINGS_THEME_ONE(Id, Symbol) +1
+#define SETTINGS_THEMES                (0 THEME_LIST (SETTINGS_THEME_ONE))
 
 // Platform features that decide which choices are offered.
 typedef struct _SETTINGS_CAPS {
@@ -76,6 +81,8 @@ typedef struct _SETTINGS {
   BOOLEAN CustomLogo;
   // The menu's language, a LANG_ID from Ui/Lang.h. Stored as its Symbol.
   UINT8 Language;
+  // The menu's colours, a THEME_ID from Ui/Theme.h. Stored as its Symbol.
+  UINT8 Theme;
 
   // The menu shows its Developer options item. Set by pressing the
   // bootloader version in Device info seven times.
@@ -112,6 +119,7 @@ typedef struct _SETTINGS {
 #define SETTINGS_KEY_MODEL_ROTATION_FOR "DeviceModelRotationFor"
 #define SETTINGS_KEY_CUSTOM_LOGO        "CustomLogo"
 #define SETTINGS_KEY_LANGUAGE           "MenuLanguage"
+#define SETTINGS_KEY_THEME              "MenuTheme"
 #define SETTINGS_KEY_DEVELOPER_OPTIONS  "DeveloperOptions"
 #define SETTINGS_KEY_USB_HOST_LIVE      "UsbHostLive"
 #define SETTINGS_KEY_DISPLAY_OFF        "DisplayOff"
@@ -139,6 +147,13 @@ SettingsDefault (OUT SETTINGS *Settings);
 // Returns the language with this LANG_LIST Symbol, or SETTINGS_LANGUAGES.
 UINT8
 SettingsLanguageFromSymbol (
+  IN CONST UINT8 *Symbol,
+  IN UINTN        Len
+);
+
+// Returns the theme with this THEME_LIST Symbol, or SETTINGS_THEMES.
+UINT8
+SettingsThemeFromSymbol (
   IN CONST UINT8 *Symbol,
   IN UINTN        Len
 );
@@ -171,6 +186,10 @@ SettingsModelVisible (IN CONST SETTINGS *Settings);
 // Cycles Auto, 0, 90, 180, 270, Auto.
 VOID
 SettingsNextRotation (IN OUT SETTINGS *Settings);
+
+// Cycles through the themes in THEME_LIST order.
+VOID
+SettingsNextTheme (IN OUT SETTINGS *Settings);
 
 // Returns the rotation to apply now, in degrees clockwise.
 UINT16

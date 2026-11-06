@@ -23,6 +23,8 @@
 # Ui/Lang/Languages.h). Its CJK face is made at build time from
 # Assets/SourceHanSansSC-Normal.otf by Scripts/mkfont.py with just the
 # characters those strings use (needs fontTools: pip install fonttools).
+# The colour themes are in Ui/Theme/, one file each (listed in
+# Ui/Theme/Themes.h).
 # The ABL image is 512 KiB and the abl partition 1 MiB, so the program is
 # kept small.
 #
@@ -77,7 +79,8 @@ OWN_FLAGS := $(BASE_FLAGS) $(DEFINES) $(foreach d,$(EDK2_INCLUDES),-isystem $(ED
 	-Wall -Wextra -Wno-unused-parameter -Werror -MMD -MP
 
 CJK_FONT := $(OBJ)/cjk-sc.oablf
-LANG_SRCS := $(sort $(wildcard Ui/Lang/*.c))
+# Theme names are drawn too, so their characters go in the CJK face.
+LANG_SRCS := $(sort $(wildcard Ui/Lang/*.c Ui/Theme/*.c))
 ASSETS := Font=Assets/montserrat.oablf FontCjk=$(CJK_FONT)
 
 .PHONY: all sim clean

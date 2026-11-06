@@ -13,20 +13,47 @@
 #include "Base/Buffer.h"
 #include "Base/Text.h"
 
-// Languages
+// Languages and themes, each stored as its Symbol
 
-// Longest stored language, in bytes.
-#define MAX_LANGUAGE_LEN 16
+// Longest stored Symbol, in bytes.
+#define MAX_SYMBOL_LEN 16
 
-#define LANGUAGE_SYMBOL(Id, Symbol) #Symbol,
+#define SYMBOL_TEXT(Id, Symbol) #Symbol,
+#define SYMBOL_FITS(Id, Symbol) \
+  _Static_assert (sizeof (#Symbol) - 1 <= MAX_SYMBOL_LEN, #Symbol);
 
-// Each language's Symbol, in LANG_LIST order, so a LANG_ID indexes it.
+// Each language's and theme's Symbol, in list order, so a LANG_ID or a
+// THEME_ID indexes it.
 STATIC CONST CHAR8 *CONST mLanguageSymbols[SETTINGS_LANGUAGES] = {
-  LANG_LIST (LANGUAGE_SYMBOL)};
+  LANG_LIST (SYMBOL_TEXT)};
+STATIC CONST CHAR8 *CONST mThemeSymbols[SETTINGS_THEMES] = {
+  THEME_LIST (SYMBOL_TEXT)};
 
-#define LANGUAGE_SYMBOL_FITS(Id, Symbol) \
-  _Static_assert (sizeof (#Symbol) - 1 <= MAX_LANGUAGE_LEN, #Symbol);
-LANG_LIST (LANGUAGE_SYMBOL_FITS)
+LANG_LIST (SYMBOL_FITS)
+THEME_LIST (SYMBOL_FITS)
+
+// Returns the index of the Symbol in Symbols that matches, or Count.
+STATIC UINT8
+SymbolIndex (
+  IN CONST CHAR8 *CONST *Symbols,
+  IN UINT8               Count,
+  IN CONST UINT8        *Symbol,
+  IN UINTN               Len
+)
+{
+  for (UINT8 Which = 0; Which < Count; Which++) {
+    CONST CHAR8 *Have  = Symbols[Which];
+    UINTN        Index = 0;
+
+    while (Index < Len && Have[Index] && Have[Index] == (CHAR8)Symbol[Index]) {
+      Index++;
+    }
+    if (Index == Len && Have[Len] == 0) {
+      return Which;
+    }
+  }
+  return Count;
+}
 
 UINT8
 SettingsLanguageFromSymbol (
@@ -34,18 +61,16 @@ SettingsLanguageFromSymbol (
   IN UINTN        Len
 )
 {
-  for (UINT8 Lang = 0; Lang < SETTINGS_LANGUAGES; Lang++) {
-    CONST CHAR8 *Have  = mLanguageSymbols[Lang];
-    UINTN        Index = 0;
+  return SymbolIndex (mLanguageSymbols, SETTINGS_LANGUAGES, Symbol, Len);
+}
 
-    while (Index < Len && Have[Index] && Have[Index] == (CHAR8)Symbol[Index]) {
-      Index++;
-    }
-    if (Index == Len && Have[Len] == 0) {
-      return Lang;
-    }
-  }
-  return SETTINGS_LANGUAGES;
+UINT8
+SettingsThemeFromSymbol (
+  IN CONST UINT8 *Symbol,
+  IN UINTN        Len
+)
+{
+  return SymbolIndex (mThemeSymbols, SETTINGS_THEMES, Symbol, Len);
 }
 
 // English, wherever LANG_LIST puts it.
@@ -53,6 +78,13 @@ STATIC UINT8
 LanguageEnglish (VOID)
 {
   return SettingsLanguageFromSymbol ((CONST UINT8 *)"En", 2);
+}
+
+// OpenABL's own theme, wherever THEME_LIST puts it.
+STATIC UINT8
+ThemeOpenAbl (VOID)
+{
+  return SettingsThemeFromSymbol ((CONST UINT8 *)"OpenAbl", 7);
 }
 
 // Rules
@@ -67,6 +99,7 @@ SettingsDefault (OUT SETTINGS *Settings)
     .Rotation      = ROTATION_AUTO,
     .ModelRotation = ROTATION_NONE,
     .Language      = LanguageEnglish (),
+    .Theme         = ThemeOpenAbl (),
   };
 }
 
@@ -147,6 +180,12 @@ SettingsNextRotation (IN OUT SETTINGS *Settings)
   } else {
     Settings->Rotation = ROTATION_AUTO;
   }
+}
+
+VOID
+SettingsNextTheme (IN OUT SETTINGS *Settings)
+{
+  Settings->Theme = (UINT8)((Settings->Theme + 1u) % SETTINGS_THEMES);
 }
 
 UINT16
@@ -460,6 +499,8 @@ typedef enum {
   FORMAT_MODEL_ROTATION,
   // Language: its Symbol from LANG_LIST.
   FORMAT_LANGUAGE,
+  // Theme: its Symbol from THEME_LIST.
+  FORMAT_THEME,
 } STORED_FORMAT;
 
 typedef struct {
@@ -489,6 +530,7 @@ STATIC CONST STORED_SETTING mStoredSettings[] = {
   OTHER_SETTING (MODEL_ROTATION, FORMAT_MODEL_ROTATION),
   BYTE_SETTING (CUSTOM_LOGO, CustomLogo, 1),
   OTHER_SETTING (LANGUAGE, FORMAT_LANGUAGE),
+  OTHER_SETTING (THEME, FORMAT_THEME),
   BYTE_SETTING (DEVELOPER_OPTIONS, DeveloperOptions, 1),
   BYTE_SETTING (USB_HOST_LIVE, UsbHostLive, 1),
   BYTE_SETTING (DISPLAY_OFF, DisplayOff, 1),
@@ -514,7 +556,7 @@ typedef struct {
 } STORED_VALUE;
 
 _Static_assert (
-  MAX_LANGUAGE_LEN <= SETTINGS_MAX_MODEL_LEN, "a language fits STORED_VALUE"
+  MAX_SYMBOL_LEN <= SETTINGS_MAX_MODEL_LEN, "a Symbol fits STORED_VALUE"
 );
 
 STATIC UINT32
@@ -601,6 +643,13 @@ EncodeSetting (
                                 : LanguageEnglish ()];
     SetValueBytes (Value, Symbol, AsciiStrLen (Symbol));
     break;
+  case FORMAT_THEME:
+    // An unknown theme is stored as OpenABL's.
+    Symbol = mThemeSymbols[Settings->Theme < SETTINGS_THEMES
+                             ? Settings->Theme
+                             : ThemeOpenAbl ()];
+    SetValueBytes (Value, Symbol, AsciiStrLen (Symbol));
+    break;
   }
 }
 
@@ -614,6 +663,7 @@ DecodeSetting (
 {
   UINT16 Word = Stored->Len == 2 ? ReadLe16 (Stored->Ptr) : 0;
   UINT8  Language;
+  UINT8  Theme;
 
   switch (Setting->Format) {
   case FORMAT_BYTE:
@@ -653,6 +703,12 @@ DecodeSetting (
     Language = SettingsLanguageFromSymbol (Stored->Ptr, Stored->Len);
     if (Language < SETTINGS_LANGUAGES) {
       Settings->Language = Language;
+    }
+    break;
+  case FORMAT_THEME:
+    Theme = SettingsThemeFromSymbol (Stored->Ptr, Stored->Len);
+    if (Theme < SETTINGS_THEMES) {
+      Settings->Theme = Theme;
     }
     break;
   }

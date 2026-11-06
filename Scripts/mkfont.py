@@ -5,7 +5,7 @@
 """Makes the CJK fallback face: mkfont.py FONT PRIMARY STRINGS... > OUT.oablf
 
 Converts the characters that the string literals in the STRINGS files
-(Ui/Lang/*.c, one per language) use from the OpenType font FONT to the .oablf
+(Ui/Lang/*.c, one per language, and Ui/Theme/*.c for the theme names) use from the OpenType font FONT to the .oablf
 format (Gfx/Font.c), at 250 units per em, one weight. Characters that the primary face PRIMARY (an .oablf) or
 ASCII already cover are left out. Fails if FONT lacks a character, so no
 string is drawn with missing glyphs. Needs fontTools.

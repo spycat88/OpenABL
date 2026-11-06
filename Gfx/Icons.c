@@ -428,6 +428,19 @@ Shape (
     LINE ({{6, 7}, {18, 7}, {18, 11}, {14, 15}, {10, 15}, {6, 11}, {6, 7}});
     LINE ({{12, 15}, {12, 21}});
     break;
+  case ICON_PALETTE:
+    // A painter's palette: round on the left, a thumb notch at the
+    // bottom right, and three dabs of paint.
+    Arc (Pen, 12, 12, 9, 9, 90, 270);
+    Arc (Pen, 12, 11, 9, 8, -90, 30);
+    LINE (
+      {{19.8f, 15}, {15, 15}, {13.5f, 15.6f}, {13, 16.75f}, {13.5f, 18.2f},
+       {13.8f, 19.5f}, {13.2f, 20.6f}, {12, 21}}
+    );
+    Circle (Pen, 8, 11, 1.25f);
+    Circle (Pen, 12, 7.5f, 1.25f);
+    Circle (Pen, 16, 11, 1.25f);
+    break;
   case ICON_COUNT:
     break;
   }

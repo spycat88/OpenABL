@@ -41,6 +41,7 @@ CONST LANG_STRINGS gLangFr = {
   .Off               = "Désactivé",
   .Rotation          = "Rotation de l'écran",
   .CustomLogo        = "Logo de démarrage personnalisé",
+  .Theme             = "Thème",
   .RotationAuto      = "Auto ({}°)",
   .DeviceModel       = "Modèle de l'appareil",
   .NotSet            = "Non défini",

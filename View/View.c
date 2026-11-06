@@ -20,6 +20,7 @@
 #include "Base/Text.h"
 #include "Gfx/Gfx.h"
 #include "Ui/Lang.h"
+#include "Ui/Theme.h"
 #include "View/Frame.h"
 #include "View/Text.h"
 #include "microui.h"
@@ -27,26 +28,29 @@
 extern CONST UINT8 gOablAssetFontCjk[];
 extern CONST UINTN gOablAssetFontCjkSize;
 
-// Theme. The menu is dark because most panels are OLED and it is used in
-// dim rooms; pure black keeps OLED pixels off.
+// Colours, from the theme in Ui/Theme/ that Settings.Theme picks. The
+// menu is dark because most panels are OLED and it is used in dim rooms;
+// the pure black background keeps OLED pixels off in every theme.
 
-#define THEME_CARD        0x171716
-#define THEME_RAISED      0x1C1C1B
-#define THEME_LINE        0x2A2A28
-#define THEME_TEXT        0xF1EFE8
-#define THEME_TEXT2       0xB4B2A9
-#define THEME_TEXT3       0x888780
-#define THEME_ACCENT      0x5DCAA5
-#define THEME_ACCENT_BG   0x085041
-#define THEME_ACCENT_TEXT 0xE1F5EE
-#define THEME_DANGER      0xF09595
-#define THEME_DANGER_BG   0x501313
-#define THEME_DANGER_FILL 0xE24B4A
-#define THEME_DANGER_TEXT 0xFCEBEB
-#define THEME_BUTTON      0x2A2A28
-#define THEME_TOAST       0x2C2C2A
-// The red of "ABL" in the wordmark.
-#define THEME_BRAND 0xFF5555
+// The theme the frame being built uses.
+STATIC CONST THEME *mPalette = &gThemeOpenAbl;
+
+#define THEME_CARD        (mPalette->Card)
+#define THEME_RAISED      (mPalette->Raised)
+#define THEME_LINE        (mPalette->Line)
+#define THEME_TEXT        (mPalette->Text)
+#define THEME_TEXT2       (mPalette->Text2)
+#define THEME_TEXT3       (mPalette->Text3)
+#define THEME_ACCENT      (mPalette->Accent)
+#define THEME_ACCENT_BG   (mPalette->AccentBg)
+#define THEME_ACCENT_TEXT (mPalette->AccentText)
+#define THEME_DANGER      (mPalette->Danger)
+#define THEME_DANGER_BG   (mPalette->DangerBg)
+#define THEME_DANGER_FILL (mPalette->DangerFill)
+#define THEME_DANGER_TEXT (mPalette->DangerText)
+#define THEME_BUTTON      (mPalette->Button)
+#define THEME_TOAST       (mPalette->Toast)
+#define THEME_BRAND       (mPalette->Brand)
 
 // An animation makes a frame at most this often.
 #define FRAME_MS        16
@@ -2125,6 +2129,7 @@ Build (IN OUT APP *A)
   BOOLEAN WithBar = Screen == SCREEN_ENTRIES && A->Countdown;
 
   mView.App       = A;
+  mPalette        = ThemeGet (A->Settings.Theme);
   mView.Now       = mView.Clock ();
   mView.LastFrame = mView.Now;
   mView.Animating = FALSE;

@@ -6,14 +6,16 @@
 /**
   Main - renders the menu's screens to PNG on the host.
 
-    openabl-menu-sim [--out DIR] [--filter TEXT] [--lang En|ZhHans] [--check]
+    openabl-menu-sim [--out DIR] [--filter TEXT] [--lang En|ZhHans]
+                     [--theme OpenAbl|Cyberpunk] [--check]
 
   For every panel and rotation it writes the main menu as the user sees it
   (*-view.png) and as the panel receives it (*-scanout.png, rotated). A few
   panel and rotation pairs also get every other screen. --check instead
   runs sessions of key presses and compares each frame with a full redraw
   and with a freshly built view. --lang picks the menu's language by its
-  Symbol in Ui/Lang/Languages.h.
+  Symbol in Ui/Lang/Languages.h, and --theme its colours by their Symbol in
+  Ui/Theme/Themes.h.
 */
 
 #include <stdio.h>
@@ -27,6 +29,7 @@
 #include "Base/Text.h"
 #include "Base/Memory.h"
 #include "Ui/Lang.h"
+#include "Ui/Theme.h"
 #include "Ui/Ui.h"
 #include "View/View.h"
 
@@ -226,6 +229,9 @@ SampleCaps (VOID)
 // The language of every app, from --lang.
 STATIC UINT8 mLanguage = LANG_EN;
 
+// The theme of every app, from --theme.
+STATIC UINT8 mTheme = THEME_OPENABL;
+
 STATIC VOID
 MakeApp (
   OUT APP           *A,
@@ -237,6 +243,7 @@ MakeApp (
   SETTINGS      Language = *Settings;
   SampleInfo (&Info);
   Language.Language = mLanguage;
+  Language.Theme    = mTheme;
   AppInit (A, &Language, &Caps, &Info, SCHEME_HANDHELD, MENU_VERSION);
   AppSetCfwParts (A, mCfwParts, sizeof (mCfwParts) / sizeof (mCfwParts[0]));
 }
@@ -1030,12 +1037,16 @@ main (
     } else if (!strcmp (Argv[Index], "--lang") && Index + 1 < Argc &&
                LangFromSymbol (Argv[Index + 1]) < LANG_COUNT) {
       mLanguage = LangFromSymbol (Argv[++Index]);
+    } else if (!strcmp (Argv[Index], "--theme") && Index + 1 < Argc &&
+               ThemeFromSymbol (Argv[Index + 1]) < THEME_COUNT) {
+      mTheme = ThemeFromSymbol (Argv[++Index]);
     } else if (!strcmp (Argv[Index], "--check")) {
       DoCheck = TRUE;
     } else {
       fprintf (
         stderr,
-        "usage: %s [--out DIR] [--filter TEXT] [--lang SYMBOL] [--check]\n",
+        "usage: %s [--out DIR] [--filter TEXT] [--lang SYMBOL] "
+        "[--theme SYMBOL] [--check]\n",
         Argv[0]
       );
       return 2;
