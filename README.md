@@ -79,14 +79,12 @@ centred on black. Several BMPs play once as an animation in name order, at
 order:
 
 1. `Boot####` options: `BootNext`, then `BootOrder`.
-2. On each drive: Boot Loader Specification entries and unified kernel
-   images, then extlinux.conf labels, then the default boot file.
+2. On each drive: Boot Loader Specification entries, then the default boot
+   file.
 
 | Method | Where it looks |
 |---|---|
 | Boot Loader Specification Type #1 entries | `\loader\entries\*.conf` |
-| Unified kernel images (Type #2 entries) | `\EFI\Linux\*.efi` |
-| extlinux.conf | `\extlinux\extlinux.conf`, `\boot\extlinux\extlinux.conf` |
 | The default boot file (GRUB, systemd-boot or any EFI loader) | `\EFI\BOOT\BOOTAA64.EFI` |
 
 The `timeout` key of `\loader\loader.conf` (read from the first allowed

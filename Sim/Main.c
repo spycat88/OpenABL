@@ -190,14 +190,13 @@ SampleModels (OUT CONST MODEL **Models)
   return sizeof (mModels) / sizeof (mModels[0]);
 }
 
-// The entries of a card with a Linux image and a UKI, and an ESP's default
-// file.
+// The entries of a card with a Linux image, an ESP with its own entry, and
+// the ESP's default file.
 STATIC CONST ENTRY_VIEW mEntries[] = {
   {"Linux", "20261003", "Linux", ENTRY_KIND_BLS, TRUE, FALSE},
   {"Linux (previous)", "20260901", "Linux", ENTRY_KIND_BLS, TRUE, FALSE},
-  {"Debian GNU/Linux 13", "6.12", "ESP", ENTRY_KIND_UKI, FALSE, FALSE},
+  {"Debian GNU/Linux 13", "6.12", "ESP", ENTRY_KIND_BLS, FALSE, FALSE},
   {"Linux nightly", "20261004", "Linux", ENTRY_KIND_BLS, TRUE, TRUE},
-  {"Recovery shell", "", "Linux", ENTRY_KIND_EXTLINUX, TRUE, FALSE},
   {"BOOTAA64.EFI", "", "ESP", ENTRY_KIND_DEFAULT_FILE, FALSE, FALSE},
 };
 

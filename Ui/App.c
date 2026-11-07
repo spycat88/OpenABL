@@ -444,12 +444,6 @@ AppEntryDetail (
   case ENTRY_KIND_BLS:
     Kind = gStrings->EntryType1;
     break;
-  case ENTRY_KIND_UKI:
-    Kind = gStrings->EntryUki;
-    break;
-  case ENTRY_KIND_EXTLINUX:
-    Kind = "extlinux.conf";
-    break;
   case ENTRY_KIND_DEFAULT_FILE:
     Kind = gStrings->DefaultFile;
     break;

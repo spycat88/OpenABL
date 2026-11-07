@@ -6,10 +6,10 @@
 /**
   BootEntries - finds what each filesystem offers to boot.
 
-  Every FAT filesystem is searched for Boot Loader Specification entries and
-  UKIs (sorted as systemd-boot sorts them), extlinux.conf labels, and the
-  default file \EFI\BOOT\BOOTAA64.EFI. Removable media come first, so an SD
-  card or USB drive overrides internal storage.
+  Every FAT filesystem is searched for Boot Loader Specification Type #1
+  entries (sorted as systemd-boot sorts them) and the default file
+  \EFI\BOOT\BOOTAA64.EFI. Removable media come first, so an SD card or USB
+  drive overrides internal storage.
 */
 
 #ifndef __BOOT_BOOT_ENTRIES_H__

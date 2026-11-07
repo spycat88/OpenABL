@@ -9,7 +9,7 @@
 #   make FEATURES=standard-boot,card-logo
 #
 # FEATURES (each becomes an OABL_ define):
-#   standard-boot     UEFI boot manager, BLS entries, UKIs, extlinux.conf
+#   standard-boot     UEFI boot manager, BLS entries
 #   card-logo         boot logo from a logo folder on the card
 #   sysfont           scaled system font fallback (needed on SM8750)
 #   sdcc-sm4450       SD card fix for SM4450's XBL (also sdcc-sm6450,

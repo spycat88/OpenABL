@@ -211,8 +211,6 @@ typedef struct _MODEL {
 // What a boot entry is. Named in the current language when drawn.
 typedef enum {
   ENTRY_KIND_BLS,
-  ENTRY_KIND_UKI,
-  ENTRY_KIND_EXTLINUX,
   ENTRY_KIND_DEFAULT_FILE,
 } ENTRY_KIND;
 

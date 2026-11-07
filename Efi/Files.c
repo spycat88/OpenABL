@@ -263,27 +263,6 @@ FileInfo (
 }
 
 BOOLEAN
-FilesReadRange (
-  IN EFI_HANDLE    Fs,
-  IN CONST CHAR16 *Path,
-  IN UINT64        Offset,
-  IN UINTN         Length,
-  OUT OABL_BUFFER *Out
-)
-{
-  EFI_FILE_PROTOCOL *File = OpenFile (Fs, Path, EFI_FILE_MODE_READ);
-  BOOLEAN            Ok;
-
-  if (!File) {
-    return FALSE;
-  }
-  Ok = File->SetPosition (File, Offset) == EFI_SUCCESS &&
-       ReadInto (File, Length, Out);
-  File->Close (File);
-  return Ok;
-}
-
-BOOLEAN
 FilesRead (
   IN EFI_HANDLE    Fs,
   IN CONST CHAR8  *Path,
@@ -323,26 +302,6 @@ FilesReadText (
   Text = Utf8Lossy (Bytes.Data, Bytes.Len);
   BufferFree (&Bytes);
   return Text;
-}
-
-BOOLEAN
-FilesReadPart (
-  IN EFI_HANDLE    Fs,
-  IN CONST CHAR8  *Path,
-  IN UINT64        Offset,
-  IN UINTN         Length,
-  OUT OABL_BUFFER *Out
-)
-{
-  CHAR16 *WidePath = Ucs2 (Path);
-  BOOLEAN Ok;
-
-  if (!WidePath) {
-    return FALSE;
-  }
-  Ok = FilesReadRange (Fs, WidePath, Offset, Length, Out);
-  FreePool (WidePath);
-  return Ok;
 }
 
 BOOLEAN

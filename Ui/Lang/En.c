@@ -168,7 +168,6 @@ CONST LANG_STRINGS gLangEn = {
   .NotInserted      = "Not inserted",
   .SrcAblScan       = "the ABL's scan",
   .EntryType1       = "BLS entry",
-  .EntryUki         = "Unified kernel image",
   .InternalStorage  = "Internal storage",
   .RemovableStorage = "Removable storage",
 };

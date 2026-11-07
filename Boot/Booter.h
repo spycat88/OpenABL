@@ -6,9 +6,9 @@
 /**
   Booter - tries the boot plan in order until an image runs.
 
-  Handles UEFI boot options, Boot Loader Specification entries and UKIs,
-  extlinux.conf, Automatic Boot Assessment and the Boot Loader Interface,
-  and hands the devicetree over as EBBR asks. The caller supplies policy
+  Handles UEFI boot options, Boot Loader Specification entries, Automatic
+  Boot Assessment and the Boot Loader Interface, and hands the devicetree
+  over as EBBR asks. The caller supplies policy
   through BOOT_HOST, such as the model's devicetree and the ABL's work just
   before an image starts.
 */
@@ -33,14 +33,10 @@ typedef struct _BOOT_HOST {
     IN VOID         *Context,
     OUT OABL_BUFFER *Out
   );
-  // Returns the selected model's compatible for extlinux FDTDIR, or NULL.
-  // The booter frees it. Defaults to BootHostDefaultModelCompatible.
-  CHAR8 *(*ModelCompatible) (IN VOID *Context);
   // Called once an image is loaded and its options are set, just before it
   // starts. Fs is its drive, or NULL. OwnDevicetree is TRUE when the entry
   // brings a devicetree, installed after this call, so the platform need
-  // not install the model's. Otherwise what is installed here stays, unless
-  // an extlinux FDTDIR finds a better match.
+  // not install the model's. Otherwise what is installed here stays.
   VOID (*BeforeStart) (
     IN VOID      *Context,
     IN EFI_HANDLE Fs OPTIONAL,
@@ -62,14 +58,6 @@ BootHostModelDevicetree (
   IN CONST BOOT_HOST *Host,
   OUT OABL_BUFFER    *Out
 );
-
-// Calls the host's ModelCompatible, or BootHostDefaultModelCompatible.
-CHAR8 *
-BootHostModelCompatible (IN CONST BOOT_HOST *Host);
-
-// Returns the first compatible of the host's ModelDevicetree.
-CHAR8 *
-BootHostDefaultModelCompatible (IN CONST BOOT_HOST *Host);
 
 typedef struct _BOOT_SCOPE {
   // With Only, search just Volumes, in that order. Otherwise search every
@@ -146,10 +134,5 @@ HandoffInstallDevicetree (
   IN CONST UINT8 *Dtb,
   IN UINTN        Size
 );
-
-// Copies the installed devicetree configuration table into Out. Returns
-// FALSE if there is none. Caller frees Out.
-BOOLEAN
-HandoffInstalledDevicetree (OUT OABL_BUFFER *Out);
 
 #endif

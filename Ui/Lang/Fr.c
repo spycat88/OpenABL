@@ -183,7 +183,6 @@ CONST LANG_STRINGS gLangFr = {
   .NotInserted      = "Non inséré",
   .SrcAblScan       = "la recherche de l'ABL",
   .EntryType1       = "Entrée BLS",
-  .EntryUki         = "Image noyau unifiée (UKI)",
   .InternalStorage  = "Stockage interne",
   .RemovableStorage = "Stockage amovible",
 };

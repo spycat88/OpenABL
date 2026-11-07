@@ -24,7 +24,6 @@
 
 #define BLS_ENTRIES_DIR "\\loader\\entries"
 #define BLS_LOADER_CONF "\\loader\\loader.conf"
-#define BLS_UKI_DIR     "\\EFI\\Linux"
 
 // Value of the architecture key that matches this loader.
 #define BLS_ARCH "aa64"
@@ -88,7 +87,6 @@ typedef struct _BLS_TYPE1 {
   CHAR8             *Kernel;
   BOOT_ENTRY_STRINGS Initrd;
   CHAR8             *Efi;
-  CHAR8             *Uki;
   BOOT_ENTRY_STRINGS Options;
   CHAR8             *Devicetree;
   BOOT_ENTRY_STRINGS DevicetreeOverlay;
@@ -113,33 +111,6 @@ BlsType1Entry (
   IN CONST CHAR8 *FileName,
   IN OABL_TEXT    Text,
   IN CONST CHAR8 *Arch,
-  OUT BOOT_ENTRY *Out
-);
-
-typedef struct _BLS_KV {
-  CHAR8 *Key;
-  CHAR8 *Value;
-} BLS_PAIR;
-
-typedef struct _BLS_KVS OABL_VEC (BLS_PAIR) BLS_PAIRS;
-
-// Parses the KEY=value pairs of an os-release file, quotes stripped.
-BOOLEAN
-BlsOsRelease (
-  IN OABL_TEXT   Text,
-  OUT BLS_PAIRS *Out
-);
-
-VOID
-BlsPairsFree (IN OUT BLS_PAIRS *Pairs);
-
-// Makes an entry from a UKI's .osrel and .uname sections. Uname is {NULL, 0}
-// if the UKI has none.
-BOOLEAN
-BlsUkiEntry (
-  IN CONST CHAR8 *FileName,
-  IN OABL_TEXT    Osrel,
-  IN OABL_TEXT    Uname,
   OUT BOOT_ENTRY *Out
 );
 

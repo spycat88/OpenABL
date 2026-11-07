@@ -421,6 +421,81 @@ Push (
   return TRUE;
 }
 
+// Splits a "key value" line at its first ASCII whitespace and trims the
+// value. A line without whitespace is all key.
+STATIC VOID
+KeyValue (
+  IN OABL_TEXT   Line,
+  OUT OABL_TEXT *Key,
+  OUT OABL_TEXT *Value
+)
+{
+  for (UINTN Index = 0; Index < Line.Len; Index++) {
+    if (IsAsciiSpace (Line.Ptr[Index])) {
+      *Key   = TextSub (Line, 0, Index);
+      *Value = TextTrim (TextSub (Line, Index + 1, Line.Len));
+      return;
+    }
+  }
+  *Key   = Line;
+  *Value = TextSub (Line, Line.Len, Line.Len);
+}
+
+// Appends the whitespace-separated words of Text. On failure, words already
+// added stay in List.
+STATIC BOOLEAN
+PushWords (
+  IN OUT BOOT_ENTRY_STRINGS *List,
+  IN OABL_TEXT               Text
+)
+{
+  UINTN Index = 0;
+
+  while (Index < Text.Len) {
+    UINTN Start;
+
+    while (Index < Text.Len && IsAsciiSpace (Text.Ptr[Index])) {
+      Index++;
+    }
+    Start = Index;
+    while (Index < Text.Len && !IsAsciiSpace (Text.Ptr[Index])) {
+      Index++;
+    }
+    if (Index > Start && !Push (List, TextSub (Text, Start, Index))) {
+      return FALSE;
+    }
+  }
+  return TRUE;
+}
+
+// Replaces *Field with a copy of Value, so the last key wins.
+STATIC BOOLEAN
+SetText (
+  IN OUT CHAR8 **Field,
+  IN OABL_TEXT   Value
+)
+{
+  CHAR8 *Copy = TextDup (Value);
+
+  if (!Copy) {
+    return FALSE;
+  }
+  FreePool (*Field);
+  *Field = Copy;
+  return TRUE;
+}
+
+// Sets Out to Path as a UEFI path, or NULL if Path is NULL.
+STATIC BOOLEAN
+OptUefiPath (
+  OUT CHAR8     **Out,
+  IN CONST CHAR8 *Path OPTIONAL
+)
+{
+  *Out = Path ? BootEntryUefiPath (TextOf (Path)) : NULL;
+  return !Path || *Out;
+}
+
 BOOLEAN
 BlsParseType1 (
   IN OABL_TEXT   Text,
@@ -439,31 +514,29 @@ BlsParseType1 (
     if (!Line.Len || Line.Ptr[0] == '#') {
       continue;
     }
-    BootEntryKeyValue (Line, &Key, &Value);
+    KeyValue (Line, &Key, &Value);
     if (TextEqStr (Key, "title")) {
-      Ok = BootEntrySetText (&Out->Title, Value);
+      Ok = SetText (&Out->Title, Value);
     } else if (TextEqStr (Key, "version")) {
-      Ok = BootEntrySetText (&Out->Version, Value);
+      Ok = SetText (&Out->Version, Value);
     } else if (TextEqStr (Key, "machine-id")) {
-      Ok = BootEntrySetText (&Out->MachineId, Value);
+      Ok = SetText (&Out->MachineId, Value);
     } else if (TextEqStr (Key, "sort-key")) {
-      Ok = BootEntrySetText (&Out->SortKey, Value);
+      Ok = SetText (&Out->SortKey, Value);
     } else if (TextEqStr (Key, "linux")) {
-      Ok = BootEntrySetText (&Out->Kernel, Value);
+      Ok = SetText (&Out->Kernel, Value);
     } else if (TextEqStr (Key, "initrd")) {
-      Ok = BootEntryPushWords (&Out->Initrd, Value, IsAsciiSpace);
+      Ok = PushWords (&Out->Initrd, Value);
     } else if (TextEqStr (Key, "efi")) {
-      Ok = BootEntrySetText (&Out->Efi, Value);
-    } else if (TextEqStr (Key, "uki")) {
-      Ok = BootEntrySetText (&Out->Uki, Value);
+      Ok = SetText (&Out->Efi, Value);
     } else if (TextEqStr (Key, "options") && Value.Len) {
       Ok = Push (&Out->Options, Value);
     } else if (TextEqStr (Key, "devicetree")) {
-      Ok = BootEntrySetText (&Out->Devicetree, Value);
+      Ok = SetText (&Out->Devicetree, Value);
     } else if (TextEqStr (Key, "devicetree-overlay")) {
-      Ok = BootEntryPushWords (&Out->DevicetreeOverlay, Value, IsAsciiSpace);
+      Ok = PushWords (&Out->DevicetreeOverlay, Value);
     } else if (TextEqStr (Key, "architecture")) {
-      Ok = BootEntrySetText (&Out->Architecture, Value);
+      Ok = SetText (&Out->Architecture, Value);
     }
     if (!Ok) {
       BlsType1Free (Out);
@@ -483,7 +556,6 @@ BlsType1Free (IN OUT BLS_TYPE1 *Type1)
   FreePool (Type1->Kernel);
   BootEntryStringsFree (&Type1->Initrd);
   FreePool (Type1->Efi);
-  FreePool (Type1->Uki);
   BootEntryStringsFree (&Type1->Options);
   FreePool (Type1->Devicetree);
   BootEntryStringsFree (&Type1->DevicetreeOverlay);
@@ -518,7 +590,7 @@ BlsType1Entry (
 )
 {
   BLS_TYPE1          Type1;
-  BOOT_ENTRY         Entry   = {.Source = BOOT_ENTRY_SOURCE_TYPE1};
+  BOOT_ENTRY         Entry   = {0};
   BOOT_ENTRY_ACTION *Action  = &Entry.Action;
   CHAR8             *Options = NULL;
   BOOLEAN            Ok;
@@ -528,10 +600,10 @@ BlsType1Entry (
     return FALSE;
   }
   // Skip other architectures and entries with nothing to start. linux wins
-  // over uki, and uki over efi.
+  // over efi.
   if ((Type1.Architecture &&
        !TextEqNoCase (TextOf (Type1.Architecture), Arch)) ||
-      (!Type1.Kernel && !Type1.Uki && !Type1.Efi)) {
+      (!Type1.Kernel && !Type1.Efi)) {
     BlsType1Free (&Type1);
     return FALSE;
   }
@@ -549,16 +621,15 @@ BlsType1Entry (
     Options         = NULL;
     Ok = Ok && Action->Kernel && Action->Cmdline &&
          BootEntryUefiPaths (&Type1.Initrd, &Action->Initrds) &&
-         BootEntryOptUefiPath (&Action->Devicetree, Type1.Devicetree) &&
+         OptUefiPath (&Action->Devicetree, Type1.Devicetree) &&
          BootEntryUefiPaths (&Type1.DevicetreeOverlay, &Action->Overlays);
   } else {
-    Action->Kind = BOOT_ENTRY_ACTION_EFI;
-    Action->Path =
-      BootEntryUefiPath (TextOf (Type1.Uki ? Type1.Uki : Type1.Efi));
+    Action->Kind    = BOOT_ENTRY_ACTION_EFI;
+    Action->Path    = BootEntryUefiPath (TextOf (Type1.Efi));
     Action->Options = Options;
     Options         = NULL;
     Ok = Ok && Action->Path &&
-         BootEntryOptUefiPath (&Action->Devicetree, Type1.Devicetree);
+         OptUefiPath (&Action->Devicetree, Type1.Devicetree);
   }
   if (Type1.Title) {
     Entry.Title = Type1.Title;
@@ -575,138 +646,6 @@ BlsType1Entry (
   Entry.File = SPrintAlloc ("%s\\%s", BLS_ENTRIES_DIR, FileName);
   Ok         = Ok && Entry.Title && Entry.File;
   BlsType1Free (&Type1);
-  if (!Ok) {
-    BootEntryFree (&Entry);
-    return FALSE;
-  }
-  *Out = Entry;
-  return TRUE;
-}
-
-BOOLEAN
-BlsOsRelease (
-  IN OABL_TEXT   Text,
-  OUT BLS_PAIRS *Out
-)
-{
-  OABL_TEXT Line;
-  OABL_TEXT Key;
-  OABL_TEXT Value;
-
-  *Out = (BLS_PAIRS){0};
-  while (TextNextLine (&Text, &Line)) {
-    BLS_PAIR Pair;
-    BOOLEAN  Escaped = FALSE;
-    UINTN    Length  = 0;
-
-    Line = TextTrim (Line);
-    if (Line.Len && Line.Ptr[0] == '#') {
-      continue;
-    }
-    if (!TextSplitOnce (Line, '=', &Key, &Value)) {
-      continue;
-    }
-    Value = TextTrim (Value);
-    if (Value.Len >= 2 && (Value.Ptr[0] == '"' || Value.Ptr[0] == '\'') &&
-        Value.Ptr[Value.Len - 1] == Value.Ptr[0]) {
-      Value = TextSub (Value, 1, Value.Len - 1);
-    }
-    Pair.Key   = TextDup (TextTrim (Key));
-    Pair.Value = AllocatePool (Value.Len + 1);
-    if (!Pair.Key || !Pair.Value || !VecPush (Out, Pair)) {
-      FreePool (Pair.Key);
-      FreePool (Pair.Value);
-      BlsPairsFree (Out);
-      return FALSE;
-    }
-    // A backslash escapes the next character and is dropped.
-    for (UINTN Index = 0; Index < Value.Len; Index++) {
-      if (Escaped || Value.Ptr[Index] != '\\') {
-        Pair.Value[Length++] = Value.Ptr[Index];
-        Escaped              = FALSE;
-      } else {
-        Escaped = TRUE;
-      }
-    }
-    Pair.Value[Length] = 0;
-  }
-  return TRUE;
-}
-
-VOID
-BlsPairsFree (IN OUT BLS_PAIRS *Pairs)
-{
-  for (UINTN Index = 0; Index < Pairs->Count; Index++) {
-    FreePool (Pairs->Items[Index].Key);
-    FreePool (Pairs->Items[Index].Value);
-  }
-  VecFree (Pairs);
-}
-
-// Returns the first non-empty value among Keys (NULL-terminated).
-STATIC CONST CHAR8 *
-Get (
-  IN CONST BLS_PAIRS    *Pairs,
-  IN CONST CHAR8 *CONST *Keys
-)
-{
-  for (; *Keys; Keys++) {
-    for (UINTN Index = 0; Index < Pairs->Count; Index++) {
-      if (AsciiStrEq (Pairs->Items[Index].Key, *Keys) &&
-          Pairs->Items[Index].Value[0]) {
-        return Pairs->Items[Index].Value;
-      }
-    }
-  }
-  return NULL;
-}
-
-BOOLEAN
-BlsUkiEntry (
-  IN CONST CHAR8 *FileName,
-  IN OABL_TEXT    Osrel,
-  IN OABL_TEXT    Uname,
-  OUT BOOT_ENTRY *Out
-)
-{
-  STATIC CONST CHAR8 *CONST TitleKeys[]   = {"PRETTY_NAME", "NAME", NULL};
-  STATIC CONST CHAR8 *CONST VersionKeys[] = {"IMAGE_VERSION", "VERSION_ID",
-                                             "BUILD_ID", NULL};
-  STATIC CONST CHAR8 *CONST SortKeys[]    = {"IMAGE_ID", "ID", NULL};
-  BLS_PAIRS                 Pairs;
-  BOOT_ENTRY                Entry = {.Source      = BOOT_ENTRY_SOURCE_UKI,
-                                     .Action.Kind = BOOT_ENTRY_ACTION_EFI};
-  CONST CHAR8              *Value;
-  BOOLEAN                   Ok = TRUE;
-
-  *Out = (BOOT_ENTRY){0};
-  if (!BlsOsRelease (Osrel, &Pairs)) {
-    return FALSE;
-  }
-  Entry.Id =
-    BlsSplitCounter (FileName, ".efi", &Entry.HasCounter, &Entry.Counter);
-  Value       = Get (&Pairs, TitleKeys);
-  Entry.Title = AsciiStrDup (Value ? Value : "Linux");
-  Value       = Get (&Pairs, VersionKeys);
-  if (Value) {
-    Entry.Version = AsciiStrDup (Value);
-    Ok            = Entry.Version != NULL;
-  } else {
-    Uname = TextTrim (Uname);
-    if (Uname.Len) {
-      Entry.Version = TextDup (Uname);
-      Ok            = Entry.Version != NULL;
-    }
-  }
-  Value = Get (&Pairs, SortKeys);
-  if (Value) {
-    Entry.SortKey = AsciiStrDup (Value);
-    Ok            = Ok && Entry.SortKey;
-  }
-  Entry.File        = SPrintAlloc ("%s\\%s", BLS_UKI_DIR, FileName);
-  Entry.Action.Path = Entry.File ? AsciiStrDup (Entry.File) : NULL;
-  Ok                = Ok && Entry.Id && Entry.Title && Entry.Action.Path;
-  BlsPairsFree (&Pairs);
   if (!Ok) {
     BootEntryFree (&Entry);
     return FALSE;

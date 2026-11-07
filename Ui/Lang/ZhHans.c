@@ -156,7 +156,6 @@ CONST LANG_STRINGS gLangZhHans = {
   .NotInserted      = "未插入",
   .SrcAblScan       = "ABL 的扫描",
   .EntryType1       = "BLS 启动项",
-  .EntryUki         = "统一内核镜像（UKI）",
   .InternalStorage  = "内部存储",
   .RemovableStorage = "外置存储",
 };

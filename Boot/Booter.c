@@ -11,8 +11,6 @@
 
 #include "Efi/Efi.h"
 
-#include <Guid/Fdt.h>
-
 #include "Base/Memory.h"
 #include "Base/Print.h"
 #include "Base/Text.h"
@@ -42,34 +40,6 @@ BootHostModelDevicetree (
   }
   BufferFree (Out);
   return FALSE;
-}
-
-CHAR8 *
-BootHostDefaultModelCompatible (IN CONST BOOT_HOST *Host)
-{
-  DT_INFO     Info;
-  OABL_BUFFER Dtb;
-  CHAR8      *Compatible = NULL;
-
-  if (!BootHostModelDevicetree (Host, &Dtb)) {
-    return NULL;
-  }
-  if (DtInspect (Dtb.Data, Dtb.Len, &Info)) {
-    Compatible      = Info.Compatible;
-    Info.Compatible = NULL;
-    DtInfoFree (&Info);
-  }
-  BufferFree (&Dtb);
-  return Compatible;
-}
-
-CHAR8 *
-BootHostModelCompatible (IN CONST BOOT_HOST *Host)
-{
-  if (Host->ModelCompatible) {
-    return Host->ModelCompatible (Host->Context);
-  }
-  return BootHostDefaultModelCompatible (Host);
 }
 
 STATIC VOID
@@ -217,8 +187,7 @@ BooterDescribe (
     CHAR8                     *Drive = BootEntriesVolumeDescribe (V);
 
     Text = Drive ? SPrintAlloc (
-                     "%s %s \"%s\" on %s", BootEntrySourceDebug (Entry->Source),
-                     Entry->Id, Entry->Title, Drive
+                     "entry %s \"%s\" on %s", Entry->Id, Entry->Title, Drive
                    )
                  : NULL;
     FreePool (Drive);
@@ -226,7 +195,7 @@ BooterDescribe (
   return Text;
 }
 
-// Reads the entry's own devicetree (BLS devicetree or extlinux FDT).
+// Reads the entry's own devicetree, from its devicetree key.
 STATIC BOOLEAN
 OwnDevicetree (
   IN EFI_HANDLE               Fs,
@@ -249,126 +218,6 @@ OwnDevicetree (
     Action->Devicetree
   );
   return FALSE;
-}
-
-STATIC INT32
-Trimmed (IN CONST CHAR8 *Path)
-{
-  UINTN Length = AsciiStrLen (Path);
-
-  while (Length && Path[Length - 1] == '\\') {
-    Length--;
-  }
-  return (INT32)Length;
-}
-
-// Finds the .dtb in Dir, or one directory down (such as qcom), whose first
-// compatible is Compat, as U-Boot finds it under FDTDIR through fdtfile.
-// Caller frees PathOut and Out.
-STATIC BOOLEAN
-FindDtb (
-  IN EFI_HANDLE    Fs,
-  IN CONST CHAR8  *Dir,
-  IN CONST CHAR8  *Compat,
-  OUT CHAR8      **PathOut,
-  OUT OABL_BUFFER *Out
-)
-{
-  FILES_DIR_ENTRIES Top          = {0};
-  struct OABL_VEC (CHAR8 *) Dirs = {0};
-  BOOLEAN Found                  = FALSE;
-  CHAR8  *DirCopy                = AsciiStrDup (Dir);
-
-  if (!DirCopy || !VecPush (&Dirs, DirCopy)) {
-    FreePool (DirCopy);
-    return FALSE;
-  }
-  FilesList (Fs, Dir, &Top);
-  for (UINTN Index = 0; Index < Top.Count; Index++) {
-    CHAR8 *Sub;
-
-    if (!Top.Items[Index].IsDir) {
-      continue;
-    }
-    Sub = SPrintAlloc ("%.*s\\%s", Trimmed (Dir), Dir, Top.Items[Index].Name);
-    if (Sub && !VecPush (&Dirs, Sub)) {
-      FreePool (Sub);
-    }
-  }
-  FilesEntriesFree (&Top);
-  for (UINTN Index = 0; Index < Dirs.Count && !Found; Index++) {
-    CONST CHAR8      *Directory = Dirs.Items[Index];
-    FILES_DIR_ENTRIES List      = {0};
-
-    FilesList (Fs, Directory, &List);
-    for (UINTN Index2 = 0; Index2 < List.Count && !Found; Index2++) {
-      DT_INFO     Info;
-      OABL_BUFFER Data;
-      CHAR8      *Path;
-
-      if (List.Items[Index2].IsDir ||
-          !TextEndsWithNoCase (TextOf (List.Items[Index2].Name), ".dtb")) {
-        continue;
-      }
-      Path = SPrintAlloc (
-        "%.*s\\%s", Trimmed (Directory), Directory, List.Items[Index2].Name
-      );
-      if (!Path) {
-        continue;
-      }
-      if (FilesRead (Fs, Path, DTB_LIMIT, &Data)) {
-        if (DtInspect (Data.Data, Data.Len, &Info)) {
-          Found = Info.Compatible && AsciiStrEq (Info.Compatible, Compat);
-          DtInfoFree (&Info);
-        }
-        if (Found) {
-          *PathOut = Path;
-          *Out     = Data;
-          break;
-        }
-        BufferFree (&Data);
-      }
-      FreePool (Path);
-    }
-    FilesEntriesFree (&List);
-  }
-  for (UINTN Index = 0; Index < Dirs.Count; Index++) {
-    FreePool (Dirs.Items[Index]);
-  }
-  VecFree (&Dirs);
-  return Found;
-}
-
-// Gets the devicetree for an entry without its own. Looks for the model's
-// in the extlinux FDTDIR first, then asks the host.
-STATIC BOOLEAN
-ModelDevicetreeFor (
-  IN CONST BOOT_HOST         *Host,
-  IN EFI_HANDLE               Fs,
-  IN CONST BOOT_ENTRY_ACTION *Action,
-  OUT OABL_BUFFER            *Out
-)
-{
-  CONST CHAR8 *Fdtdir =
-    Action->Kind == BOOT_ENTRY_ACTION_LINUX ? Action->FdtDir : NULL;
-  // Ask even without an FDTDIR, so the host's ModelCompatible always runs.
-  CHAR8 *Compat = BootHostModelCompatible (Host);
-
-  if (Fdtdir && Compat) {
-    CHAR8 *Path = NULL;
-
-    if (FindDtb (Fs, Fdtdir, Compat, &Path, Out)) {
-      SerialLog ("  devicetree for %s from FDTDIR: %s", Compat, Path);
-      FreePool (Path);
-      FreePool (Compat);
-      return TRUE;
-    }
-    SerialLog (
-      "  no devicetree for %s in %s; using the model's", Compat, Fdtdir
-    );
-  }
-  FreePool (Compat);
-  return BootHostModelDevicetree (Host, Out);
 }
 
 // Installs Dtb, if any, and starts the image. Frees Dtb. The host's
@@ -501,9 +350,9 @@ Start (
 typedef struct _ID_LIST
 OABL_VEC (CHAR8 *) ID_LIST;
 
-// Starts a Boot Loader Specification entry or extlinux label. Counts the
-// try, loads the image, sets the Boot Loader Interface variables, then
-// installs the devicetree and runs it.
+// Starts a Boot Loader Specification entry. Counts the try, loads the image,
+// sets the Boot Loader Interface variables, then installs the devicetree and
+// runs it.
 STATIC OUTCOME
 StartEntry (
   IN OUT BOOTER      *Booter,
@@ -523,7 +372,6 @@ StartEntry (
   ID_LIST                    Ids = {0};
   BOOT_ENTRY                 Entry;
   OUTCOME                    Outcome;
-  CHAR8                     *File;
   CHAR8                     *CountPath = NULL;
   CHAR8                     *Err       = NULL;
   CHAR8                     *ImagePath;
@@ -533,17 +381,9 @@ StartEntry (
   if (!BootEntryClone (&V->Entries.Items[EntryIndex], &Entry)) {
     return Skipped (AsciiStrDup ("out of memory"));
   }
-  SerialLog (
-    "entry %s \"%s\" (%s)", Entry.Id, Entry.Title,
-    BootEntrySourceDebug (Entry.Source)
-  );
+  SerialLog ("entry %s \"%s\"", Entry.Id, Entry.Title);
 
   // Automatic Boot Assessment. Record the try before booting.
-  File = AsciiStrDup (Entry.File);
-  if (!File) {
-    BootEntryFree (&Entry);
-    return Skipped (AsciiStrDup ("out of memory"));
-  }
   if (Entry.HasCounter) {
     BLS_COUNTER Next = BlsCounterBumped (Entry.Counter);
     CHAR8      *Name = BlsCountedName (Entry.Id, Next);
@@ -562,16 +402,14 @@ StartEntry (
           &Booter->Volumes.Items[VolumeIndex].Entries.Items[EntryIndex];
         CHAR8 *StoredFile = AsciiStrDup (Renamed);
 
-        FreePool (File);
-        File = Renamed;
-        SerialLog ("  boot counting: %s -> %s", Entry.File, File);
+        SerialLog ("  boot counting: %s -> %s", Entry.File, Renamed);
         if (StoredFile) {
           FreePool (Stored->File);
           Stored->File = StoredFile;
         }
         Stored->HasCounter = TRUE;
         Stored->Counter    = Next;
-        CountPath          = AsciiStrDup (File);
+        CountPath          = Renamed;
       }
     } else {
       SerialLog (
@@ -613,15 +451,11 @@ StartEntry (
       goto Done;
     }
   } else {
-    // A UKI is the entry file itself, which boot counting may just have
-    // renamed.
-    CONST CHAR8 *Path =
-      AsciiStrEq (Entry.Action.Path, Entry.File) ? File : Entry.Action.Path;
     OABL_BUFFER Node = {0};
     OABL_BUFFER Full = {0};
     BOOLEAN     Loaded;
 
-    if (UefiFilePathNode (Path, &Node)) {
+    if (UefiFilePathNode (Entry.Action.Path, &Node)) {
       UefiJoin ((OABL_BYTES[]){Dev, BufferBytes (&Node)}, 2, &Full);
     }
     Loaded = LoadFile (&Full, &Image, &Err);
@@ -647,11 +481,7 @@ StartEntry (
   for (UINTN Index = 0; Index < Booter->Volumes.Count; Index++) {
     for (UINTN Index2 = 0; Index2 < Booter->Volumes.Items[Index].Entries.Count;
          Index2++) {
-      if (BootEntryIsBls (
-            &Booter->Volumes.Items[Index].Entries.Items[Index2]
-          )) {
-        VecPush (&Ids, Booter->Volumes.Items[Index].Entries.Items[Index2].Id);
-      }
+      VecPush (&Ids, Booter->Volumes.Items[Index].Entries.Items[Index2].Id);
     }
   }
   ImagePath = UefiFilePathText (
@@ -673,14 +503,13 @@ StartEntry (
   // install the model's only to have it replaced.
   Own = OwnDevicetree (Fs, &Entry.Action, &Dtb);
   HostBeforeStart (Host, Fs, Own);
-  HasDtb  = Own || ModelDevicetreeFor (Host, Fs, &Entry.Action, &Dtb);
+  HasDtb  = Own || BootHostModelDevicetree (Host, &Dtb);
   Outcome = Run (Host, Image, HasDtb ? &Dtb : NULL, Entry.Title);
 Done:
   // The load options and initrd must stay until the image has run.
   BufferFree (&Options);
   LinuxBootInitrdFree (Initrd);
   FreePool (CountPath);
-  FreePool (File);
   BootEntryFree (&Entry);
   return Outcome;
 }
@@ -746,23 +575,6 @@ BooterBoot (
 
 // EBBR hand-over
 
-// FDT header size, and the largest installed devicetree copied (as
-// DTB_LIMIT).
-#define FDT_HEADER_SIZE     40
-#define INSTALLED_DTB_LIMIT ((UINT32)8 << 20)
-
-// Returns the configuration table for Guid, or NULL.
-STATIC VOID *
-HasTable (IN CONST EFI_GUID *Guid)
-{
-  for (UINTN Index = 0; Index < gST->NumberOfTableEntries; Index++) {
-    if (CompareGuid (&gST->ConfigurationTable[Index].VendorGuid, Guid)) {
-      return gST->ConfigurationTable[Index].VendorTable;
-    }
-  }
-  return NULL;
-}
-
 STATIC VOID
 LogToSink (
   IN VOID        *Context,
@@ -791,27 +603,4 @@ HandoffInstallDevicetree (
     "devicetree installed: %zu bytes in ACPI-reclaim memory at %p", Len, At
   );
   return NULL;
-}
-
-BOOLEAN
-HandoffInstalledDevicetree (OUT OABL_BUFFER *Out)
-{
-  CONST UINT8 *Blob = HasTable (&gFdtTableGuid);
-  UINT32       Total;
-
-  *Out = (OABL_BUFFER){0};
-  if (!Blob) {
-    return FALSE;
-  }
-  // FDT magic, then the big-endian total size at offset 4.
-  if (Blob[0] != 0xd0 || Blob[1] != 0x0d || Blob[2] != 0xfe ||
-      Blob[3] != 0xed) {
-    return FALSE;
-  }
-  Total = ReadBe32 (Blob + 4);
-  // Don't copy a blob whose size can't be a devicetree's.
-  if (Total < FDT_HEADER_SIZE || Total > INSTALLED_DTB_LIMIT) {
-    return FALSE;
-  }
-  return BufferFrom (Out, Blob, Total);
 }

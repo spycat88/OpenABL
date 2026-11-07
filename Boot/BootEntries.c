@@ -13,16 +13,12 @@
 #include "Base/Print.h"
 #include "Core/Bls.h"
 #include "Core/EfiData.h"
-#include "Core/Extlinux.h"
-#include "Core/Pe.h"
 #include "Base/Buffer.h"
 #include "Efi/Files.h"
 #include "Efi/Serial.h"
 
 // Size limit for entry files and loader.conf.
 #define TEXT_LIMIT ((UINTN)64 << 10)
-// Bytes read from the start of a UKI to get its section table.
-#define PE_HEAD 4096
 
 CONST CHAR8 *
 BootEntriesVolumeKind (IN CONST BOOT_ENTRIES_VOLUME *V)
@@ -151,143 +147,6 @@ Type1Entries (
   FilesEntriesFree (&List);
 }
 
-// Reads a UKI's section Name as text, up to TEXT_LIMIT bytes. Returns NULL
-// if there is no such section.
-STATIC CHAR8 *
-Section (
-  IN EFI_HANDLE         Fs,
-  IN CONST CHAR8       *Path,
-  IN CONST PE_SECTIONS *Sections,
-  IN CONST CHAR8       *Name
-)
-{
-  CONST PE_SECTION *Found = PeFind (Sections->Items, Sections->Count, Name);
-  OABL_BUFFER       Data;
-  UINT64            Offset;
-  UINTN             Len;
-  CHAR8            *Text;
-
-  if (!Found) {
-    return NULL;
-  }
-  PeSectionDataRange (Found, &Offset, &Len);
-  if (!FilesReadPart (
-        Fs, Path, Offset, Len < TEXT_LIMIT ? Len : TEXT_LIMIT, &Data
-      )) {
-    return NULL;
-  }
-  Text = Utf8Lossy (Data.Data, Data.Len);
-  BufferFree (&Data);
-  return Text;
-}
-
-STATIC VOID
-UkiEntries (
-  IN EFI_HANDLE           Fs,
-  IN OUT BOOT_ENTRY_LIST *Out
-)
-{
-  FILES_DIR_ENTRIES List = {0};
-
-  FilesList (Fs, BLS_UKI_DIR, &List);
-  for (UINTN Index = 0; Index < List.Count; Index++) {
-    CONST CHAR8 *Name     = List.Items[Index].Name;
-    PE_SECTIONS  Sections = {0};
-    OABL_BUFFER  Head;
-    BOOT_ENTRY   Entry;
-    CHAR8       *Path;
-    CHAR8       *Osrel;
-    CHAR8       *Uname;
-
-    if (List.Items[Index].IsDir ||
-        !TextEndsWithNoCase (TextOf (Name), ".efi")) {
-      continue;
-    }
-    Path = SPrintAlloc ("%s\\%s", BLS_UKI_DIR, Name);
-    if (!Path) {
-      continue;
-    }
-    if (!FilesReadPart (Fs, Path, 0, PE_HEAD, &Head)) {
-      FreePool (Path);
-      continue;
-    }
-    if (!PeSections (Head.Data, Head.Len, &Sections)) {
-      SerialLog ("  %s: not a PE image; skipped", Path);
-    } else if (!PeFind (Sections.Items, Sections.Count, ".linux")) {
-      SerialLog ("  %s: no .linux section, not a UKI; skipped", Path);
-    } else {
-      Osrel = Section (Fs, Path, &Sections, ".osrel");
-      Uname = Section (Fs, Path, &Sections, ".uname");
-      if (BlsUkiEntry (
-            Name, TextOf (Osrel ? Osrel : ""),
-            Uname ? TextOf (Uname) : (OABL_TEXT){NULL, 0}, &Entry
-          )) {
-        PushEntry (Out, &Entry);
-      }
-      FreePool (Osrel);
-      FreePool (Uname);
-    }
-    VecFree (&Sections);
-    BufferFree (&Head);
-    FreePool (Path);
-  }
-  FilesEntriesFree (&List);
-}
-
-// Reads an extlinux INCLUDE file from the filesystem in Context.
-STATIC CHAR8 *
-ReadInclude (
-  IN OABL_TEXT IncludePath,
-  OUT UINTN   *Length,
-  IN VOID     *Context
-)
-{
-  EFI_HANDLE Fs   = *(EFI_HANDLE *)Context;
-  CHAR8     *Path = BootEntryUefiPath (IncludePath);
-  CHAR8     *Text;
-
-  if (!Path) {
-    return NULL;
-  }
-  Text = FilesReadText (Fs, Path, TEXT_LIMIT);
-  FreePool (Path);
-  if (Text) {
-    *Length = AsciiStrLen (Text);
-  }
-  return Text;
-}
-
-// Adds the labels of the first extlinux.conf found in gExtlinuxPaths.
-STATIC VOID
-ExtlinuxEntries (
-  IN EFI_HANDLE           Fs,
-  IN OUT BOOT_ENTRY_LIST *Out
-)
-{
-  for (UINTN Index = 0;
-       Index < sizeof (gExtlinuxPaths) / sizeof (*gExtlinuxPaths); Index++) {
-    CONST CHAR8    *Conf = gExtlinuxPaths[Index];
-    EXTLINUX_CONFIG Config;
-    BOOT_ENTRY_LIST Entries = {0};
-    CHAR8          *Text    = FilesReadText (Fs, Conf, TEXT_LIMIT);
-
-    if (!Text) {
-      continue;
-    }
-    if (ExtlinuxParse (TextOf (Text), ReadInclude, &Fs, &Config)) {
-      ExtlinuxConfigEntries (&Config, Conf, &Entries);
-      ExtlinuxConfigFree (&Config);
-    }
-    FreePool (Text);
-    SerialLog ("  %s: %zu label(s)", Conf, Entries.Count);
-    for (UINTN Index2 = 0; Index2 < Entries.Count; Index2++) {
-      PushEntry (Out, &Entries.Items[Index2]);
-    }
-    VecFree (&Entries);
-    return;
-  }
-}
-
 // Lists everything bootable on one filesystem, in boot order.
 STATIC VOID
 Scan (
@@ -300,7 +159,6 @@ Scan (
   UINTN  Default;
 
   Type1Entries (Fs, Out);
-  UkiEntries (Fs, Out);
   BlsSort (Out->Items, Out->Count);
   Conf = FilesReadText (Fs, BLS_LOADER_CONF, TEXT_LIMIT);
   if (Conf) {
@@ -317,7 +175,6 @@ Scan (
   }
   FreePool (Pattern);
   FreePool (Conf);
-  ExtlinuxEntries (Fs, Out);
 }
 
 STATIC BOOLEAN
@@ -393,8 +250,8 @@ BootEntriesDiscover (
         Entry->HasCounter, Entry->Counter, Counter, sizeof (Counter)
       );
       SerialLog (
-        "  %s %s \"%s\" %s%s", BootEntrySourceDebug (Entry->Source), Entry->Id,
-        Entry->Title, Counter, BootEntryIsBad (Entry) ? " (bad)" : ""
+        "  %s \"%s\" %s%s", Entry->Id, Entry->Title, Counter,
+        BootEntryIsBad (Entry) ? " (bad)" : ""
       );
     }
     if (!VecPush (Out, V)) {

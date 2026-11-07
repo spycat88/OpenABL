@@ -25,17 +25,6 @@
 #include "Core/BootDecision.h"
 #include "Core/Settings.h"
 
-// Reads up to Length bytes of Path (UCS-2) from Offset. Returns less if the
-// file ends first, FALSE if it can't be opened or read.
-BOOLEAN
-FilesReadRange (
-  IN EFI_HANDLE    Fs,
-  IN CONST CHAR16 *Path,
-  IN UINT64        Offset,
-  IN UINTN         Length,
-  OUT OABL_BUFFER *Out
-);
-
 // Reads the whole file at Path. Fails if it is larger than Limit bytes.
 BOOLEAN
 FilesRead (
@@ -52,16 +41,6 @@ FilesReadText (
   IN EFI_HANDLE   Fs,
   IN CONST CHAR8 *Path,
   IN UINTN        Limit
-);
-
-// FilesReadRange with a UTF-8 path.
-BOOLEAN
-FilesReadPart (
-  IN EFI_HANDLE    Fs,
-  IN CONST CHAR8  *Path,
-  IN UINT64        Offset,
-  IN UINTN         Length,
-  OUT OABL_BUFFER *Out
 );
 
 // Returns TRUE if Path opens and is a file.

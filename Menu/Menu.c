@@ -406,20 +406,6 @@ STATIC BOOT_ENTRIES_VOLUMES mVolumes;
 STATIC UINTN                mEntryVolume[MAX_ENTRIES];
 STATIC CHAR8                mEntryIds[MAX_ENTRIES][256];
 
-STATIC ENTRY_KIND
-EntryKind (IN BOOT_ENTRY_SOURCE Source)
-{
-  switch (Source) {
-  case BOOT_ENTRY_SOURCE_TYPE1:
-    return ENTRY_KIND_BLS;
-  case BOOT_ENTRY_SOURCE_UKI:
-    return ENTRY_KIND_UKI;
-  case BOOT_ENTRY_SOURCE_EXTLINUX:
-    break;
-  }
-  return ENTRY_KIND_EXTLINUX;
-}
-
 // Adds a row for drive Volume of mVolumes, if there is room.
 STATIC VOID
 AddRow (
@@ -483,8 +469,7 @@ FillEntries (
 
       AddRow (
         Views, &Count, Index, Entry->Title ? Entry->Title : Entry->Id,
-        EntryKind (Entry->Source), Entry->Version,
-        BootEntryIsBad (Entry), Entry->Id
+        ENTRY_KIND_BLS, Entry->Version, BootEntryIsBad (Entry), Entry->Id
       );
     }
   }

@@ -16,7 +16,6 @@
 #include "Base/Print.h"
 #include "Base/Text.h"
 #include "Core/BootDecision.h"
-#include "Core/DeviceTree.h"
 #include "Core/UsbHostRegs.h"
 #include "Efi/Abl.h"
 #include "Efi/Efi.h"
@@ -214,24 +213,6 @@ StdModelDevicetree (
   return FALSE;
 }
 
-// Returns the installed devicetree's compatible, or NULL. Caller frees it.
-STATIC CHAR8 *
-StdModelCompatible (IN VOID *Context)
-{
-  OABL_BUFFER Dt = {0};
-  DT_INFO     Info;
-  CHAR8      *Compatible = NULL;
-
-  (VOID)Context;
-  if (HandoffInstalledDevicetree (&Dt) && DtInspect (Dt.Data, Dt.Len, &Info)) {
-    Compatible      = Info.Compatible;
-    Info.Compatible = NULL;
-    DtInfoFree (&Info);
-  }
-  BufferFree (&Dt);
-  return Compatible;
-}
-
 STATIC VOID
 StdBeforeStart (
   IN VOID      *Context,
@@ -260,7 +241,6 @@ StandardBoot (
   BOOT_HOST    BootHost = {
     .Context         = (VOID *)Ctx,
     .ModelDevicetree = StdModelDevicetree,
-    .ModelCompatible = StdModelCompatible,
     .BeforeStart     = StdBeforeStart,
     .AfterReturn     = ReturnedToMenu,
   };
