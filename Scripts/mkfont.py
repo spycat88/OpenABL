@@ -2,13 +2,18 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026-present Open Handheld Collective
 #   https://github.com/OpenHandheldCollective
-"""Makes the CJK fallback face: mkfont.py FONT PRIMARY STRINGS... > OUT.oablf
+"""Makes the CJK fallback face:
+mkfont.py FONT[,MORE[@wght=N]...] PRIMARY STRINGS... > OUT.oablf
 
 Converts the characters that the string literals in the STRINGS files
 (Ui/Lang/*.c, one per language) use from the OpenType font FONT to the .oablf
-format (Gfx/Font.c), at 250 units per em, one weight. Characters that the primary face PRIMARY (an .oablf) or
-ASCII already cover are left out. Fails if FONT lacks a character, so no
-string is drawn with missing glyphs. Needs fontTools.
+format (Gfx/Font.c), at 250 units per em, one weight. Characters that the
+primary face PRIMARY (an .oablf) or ASCII already cover are left out.
+
+A character FONT lacks comes from the first MORE font that has it, scaled so
+that its capital H is as tall as FONT's, so the faces' letters line up. A
+variable MORE font is first set to the weight @wght=N names. Fails if no font
+has a character, so no string is drawn with missing glyphs. Needs fontTools.
 """
 import re
 import struct
@@ -17,6 +22,7 @@ import sys
 from fontTools.pens.basePen import BasePen
 from fontTools.pens.boundsPen import BoundsPen
 from fontTools.ttLib import TTFont
+from fontTools.varLib.instancer import instantiateVariableFont
 
 UNITS_PER_EM = 250
 
@@ -115,10 +121,32 @@ class OutlinePen(BasePen):
     _endPath = _closePath
 
 
+def cap_height(font):
+    """Returns the height of the capital H in font units."""
+    glyph_set = font.getGlyphSet()
+    pen = BoundsPen(glyph_set)
+    glyph_set[font.getBestCmap()[ord('H')]].draw(pen)
+    return pen.bounds[3]
+
+
+def open_font(spec):
+    """Opens FONT, or FONT@axis=value[:axis=value...] set to those axes."""
+    path, _, axes = spec.partition('@')
+    if not axes:
+        return TTFont(path, lazy=True)
+    location = {}
+    for axis in axes.split(':'):
+        tag, _, value = axis.partition('=')
+        location[tag] = float(value)
+    return instantiateVariableFont(TTFont(path), location)
+
+
 def main():
     if len(sys.argv) < 4:
-        sys.exit('usage: mkfont.py FONT PRIMARY STRINGS... > OUT.oablf')
-    font_path, primary_path, *strings_paths = sys.argv[1:]
+        sys.exit('usage: mkfont.py FONT[,MORE[@wght=N]...] PRIMARY STRINGS... '
+                 '> OUT.oablf')
+    font_specs, primary_path, *strings_paths = sys.argv[1:]
+    specs = font_specs.split(',')
     covered = primary_chars(primary_path)
     wanted = {}
     for strings_path in strings_paths:
@@ -127,22 +155,28 @@ def main():
                 if ord(char) > 0x7f and ord(char) not in covered:
                     wanted.setdefault(ord(char), text)
 
-    font = TTFont(font_path, lazy=True)
-    cmap = font.getBestCmap()
-    missing = [c for c in sorted(wanted) if c not in cmap or c > 0xffff]
+    fonts = [open_font(spec) for spec in specs]
+    font = fonts[0]
+    ratio = UNITS_PER_EM / font['head'].unitsPerEm
+    sources = []
+    for other in fonts:
+        sources.append((other.getBestCmap(), other.getGlyphSet(),
+                        ratio * cap_height(font) / cap_height(other)
+                        if other is not font else ratio))
+    missing = [c for c in sorted(wanted)
+               if c > 0xffff or not any(c in cmap for cmap, _, _ in sources)]
     if missing:
         for c in missing:
-            print(f'mkfont.py: {font_path} has no U+{c:04X} {chr(c)!r}, '
+            print(f'mkfont.py: {" ".join(specs)} has no U+{c:04X} {chr(c)!r}, '
                   f'used in "{wanted[c]}"', file=sys.stderr)
         sys.exit(1)
 
-    upm = font['head'].unitsPerEm
-    ratio = UNITS_PER_EM / upm
-    glyph_set = font.getGlyphSet()
     chars = sorted(wanted)
     records = bytearray()
     outlines = bytearray()
     for char in chars:
+        cmap, glyph_set, ratio = next(source for source in sources
+                                      if char in source[0])
         glyph = glyph_set[cmap[char]]
         pen = OutlinePen(glyph_set, ratio)
         glyph.draw(pen)
@@ -156,6 +190,7 @@ def main():
                                y1, len(outlines))
         outlines += pen.data
 
+    ratio = sources[0][2]
     hhea = font['hhea']
     header = struct.pack('<4sHHhhhHH', b'OABF', 1, UNITS_PER_EM,
                          scale(hhea.ascent, ratio), scale(hhea.descent, ratio),

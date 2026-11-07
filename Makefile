@@ -23,6 +23,9 @@
 # Ui/Lang/Languages.h). Its CJK face is made at build time from
 # Assets/SourceHanSansSC-Normal.otf by Scripts/mkfont.py with just the
 # characters those strings use (needs fontTools: pip install fonttools).
+# Characters Source Han Sans lacks, such as Ukrainian і ї є ґ, come from
+# Source Sans 3, the design its Latin and Cyrillic are drawn from, at the
+# weight of Source Han Sans Normal.
 # The ABL image is 512 KiB and the abl partition 1 MiB, so the program is
 # kept small.
 #
@@ -101,9 +104,10 @@ $(OBJ)/$(VARIANT)/%.o: %.c
 	$(CC) $(OWN_FLAGS) -c $< -o $@
 
 # The CJK face: the characters the strings use, from the full font.
-$(CJK_FONT): Scripts/mkfont.py Assets/SourceHanSansSC-Normal.otf Assets/montserrat.oablf $(LANG_SRCS)
+CJK_SOURCES := Assets/SourceHanSansSC-Normal.otf,Assets/SourceSans3VF-Upright.otf@wght=370
+$(CJK_FONT): Scripts/mkfont.py Assets/SourceHanSansSC-Normal.otf Assets/SourceSans3VF-Upright.otf Assets/montserrat.oablf $(LANG_SRCS)
 	@mkdir -p $(@D)
-	$(PYTHON) Scripts/mkfont.py Assets/SourceHanSansSC-Normal.otf Assets/montserrat.oablf $(LANG_SRCS) > $@.tmp
+	$(PYTHON) Scripts/mkfont.py $(CJK_SOURCES) Assets/montserrat.oablf $(LANG_SRCS) > $@.tmp
 	@mv $@.tmp $@
 
 $(OBJ)/$(VARIANT)/assets.c: Scripts/bin2c.py $(wildcard Assets/*.oablf) $(CJK_FONT)
