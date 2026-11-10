@@ -10,6 +10,7 @@
 #include "Efi/Display.h"
 
 #include "Efi/Handover.h"
+#include "Efi/Quirks.h"
 
 // GET_PROTOCOL leaves the console driver bound to the GOP. We only call Blt
 // and read the mode.
@@ -29,9 +30,54 @@ OpenGop (
   return Status;
 }
 
+// ChipInfo id of the SM8250.
+#define CHIP_SM8250 356u
+
+// SM8250 MDSS registers, as physical addresses.
+// DSI0 CTRL; bit 0 is set while the controller is on.
+#define DSI0_CTRL 0x0AE94004ull
+// Tear check SYNC_CONFIG_VSYNC; bit 20 is hw_vsync_mode.
+#define TE_SYNC_CONFIG_VSYNC 0x0AE6BA88ull
+#define TE_HW_VSYNC_MODE     0x00100000u
+// Written as 1 alongside the above in the original patch. What it enables
+// is undocumented.
+#define TE_ENABLE 0x0AE6B0A8ull
+
+// Retroid's Panel_vtdr6130_visionox_cog_1080p_cmd.xml leaves out
+// <DSITEUsingDedicatedTEPin>True, so DisplayDxe never syncs frame transfers
+// to the panel's TE pin and the command-mode panel tears. Setting
+// hw_vsync_mode makes each 60 Hz TE edge on GPIO 66 reset the read pointer,
+// so the DSI transfer starts 21 lines into vblank. Done once a boot, only on
+// an SM8250 with DSI0 on and a 1080x1920 mode.
+STATIC VOID
+EnableTearCheck (IN EFI_GRAPHICS_OUTPUT_PROTOCOL *Gop)
+{
+#if defined(__aarch64__)
+  STATIC BOOLEAN mDone = FALSE;
+
+  if (mDone) {
+    return;
+  }
+  mDone = TRUE;
+  if (Gop->Mode->Info->HorizontalResolution != 1080 ||
+      Gop->Mode->Info->VerticalResolution != 1920 ||
+      QuirksChipId () != CHIP_SM8250 ||
+      (*(volatile CONST UINT32 *)(UINTN)DSI0_CTRL & 0x1u) == 0) {
+    return;
+  }
+  *(volatile UINT32 *)(UINTN)TE_SYNC_CONFIG_VSYNC =
+    *(volatile CONST UINT32 *)(UINTN)TE_SYNC_CONFIG_VSYNC | TE_HW_VSYNC_MODE;
+  *(volatile UINT32 *)(UINTN)TE_ENABLE = 1u;
+  __asm__ volatile ("dsb sy" : : : "memory");
+#else
+  (VOID)Gop;
+#endif
+}
+
 STATIC DISPLAY
 Opened (IN EFI_GRAPHICS_OUTPUT_PROTOCOL *Gop)
 {
+  EnableTearCheck (Gop);
   return (DISPLAY){Gop, Gop->Mode->Info->HorizontalResolution,
                    Gop->Mode->Info->VerticalResolution};
 }
