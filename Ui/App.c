@@ -536,12 +536,12 @@ AppRows (
   ADD_ITEM (ITEM_BOOT_MODE);
   ADD_ITEM (ITEM_ABL_MODE);
   ADD_ITEM (ITEM_ALT_VOLUME_UP);
+  ADD_ITEM (ITEM_REVERSE_VOLUME);
   if (SettingsBootSourceVisible (Settings, Caps)) {
     ADD_ITEM (ITEM_BOOT_SOURCE);
   }
   ADD_ITEM (ITEM_CHARGING);
   ADD_ITEM (ITEM_ROTATION);
-  ADD_ITEM (ITEM_REVERSE_VOLUME);
   ADD_ITEM (ITEM_CUSTOM_LOGO);
   if (SettingsModelVisible (Settings)) {
     ADD_ITEM (ITEM_MODEL);
@@ -712,6 +712,13 @@ AppItemView (
     View->Label = gStrings->VolumeUp;
     AsciiStrCopy (Value, Cap, AltVolumeLabel (A));
     break;
+  case ITEM_REVERSE_VOLUME:
+    View->Icon  = ICON_VOLUME;
+    View->Label = gStrings->ReverseVolume;
+    AsciiStrCopy (
+      Value, Cap, Settings->ReverseVolume ? gStrings->On : gStrings->Off
+    );
+    break;
   case ITEM_BOOT_SOURCE: {
     STATIC CONST CHAR8 *CONST Usb       = "USB";
     CONST CHAR8 *CONST        Sources[] = {gStrings->Auto, gStrings->Internal,
@@ -732,13 +739,6 @@ AppItemView (
     View->Icon  = ICON_ROTATE;
     View->Label = gStrings->Rotation;
     RotationLabel (A, Value, Cap);
-    break;
-  case ITEM_REVERSE_VOLUME:
-    View->Icon  = ICON_VOLUME;
-    View->Label = gStrings->ReverseVolume;
-    AsciiStrCopy (
-      Value, Cap, Settings->ReverseVolume ? gStrings->On : gStrings->Off
-    );
     break;
   case ITEM_CUSTOM_LOGO:
     View->Icon  = ICON_PHOTO;
@@ -836,6 +836,9 @@ Activate (
   case ITEM_ALT_VOLUME_UP:
     Settings->AltVolumeUp = !Settings->AltVolumeUp;
     return Command (COMMAND_SAVE_SETTINGS, 0);
+  case ITEM_REVERSE_VOLUME:
+    Settings->ReverseVolume = !Settings->ReverseVolume;
+    return Command (COMMAND_SAVE_SETTINGS, 0);
   case ITEM_BOOT_SOURCE:
     SettingsNextBootSource (Settings, &A->Caps);
     return Command (COMMAND_SAVE_SETTINGS, 0);
@@ -844,9 +847,6 @@ Activate (
     return Command (COMMAND_SAVE_SETTINGS, 0);
   case ITEM_ROTATION:
     SettingsNextRotation (Settings);
-    return Command (COMMAND_SAVE_SETTINGS, 0);
-  case ITEM_REVERSE_VOLUME:
-    Settings->ReverseVolume = !Settings->ReverseVolume;
     return Command (COMMAND_SAVE_SETTINGS, 0);
   case ITEM_CUSTOM_LOGO:
     Settings->CustomLogo = !Settings->CustomLogo;

@@ -40,9 +40,7 @@ At power-on:
 | Volume Up | Boots Android when the boot mode is Linux, or Android recovery when it is Android. With *Volume up at boot* set to *Linux (external)*, boots Linux from the SD card or a USB drive instead. |
 
 In the menu, Volume Up and Down move the selection and Power selects.
-
-The *Reverse volume buttons* setting swaps their navigation directions. It is
-off by default and is saved across restarts.
+*Reverse volume buttons* swaps Up and Down.
 
 | Item | What it does |
 |---|---|
@@ -56,10 +54,10 @@ off by default and is saved across restarts.
 | Boot mode | Linux or Android. |
 | ABL mode | Silent, or Verbose to show the ABL's log on screen while booting. |
 | Volume up at boot | Sets what holding Volume Up at power-on does. |
+| Reverse volume buttons | Swaps what Volume Up and Down (and the Up and Down keys) do in the menu, for devices whose buttons point the other way from the screen. Off by default. It doesn't change the keys held at power-on. |
 | Boot source | Auto (internal storage first), Internal, SD card or USB. |
 | Off-mode charging | Shows the charger screen when plugged in while powered off. |
 | Display rotation | Auto (from the device model) or fixed at 0, 90, 180 or 270 degrees. |
-| Reverse volume buttons | Swaps the menu navigation direction of Volume Up and Volume Down. |
 | Custom boot logo | Replaces the manufacturer's logo at boot with the pictures in a `\logo` folder (see below), or the OpenABL wordmark if there are none. Off by default. |
 | Device model | Selects the devicetree Linux boots with, from the `.dtb` files in `\boot\grub`, `\dtbs`, `\dtbs\qcom`, `\dtb` or `\dtb\qcom` on the boot source's drives. A boot entry's own devicetree takes precedence. *Firmware default* uses the firmware's own. |
 | Developer options | Hidden until unlocked by selecting *Bootloader* in *Device info* seven times. Opens a list of developer switches, all off by default: *Live USB host* (start USB host without a restart, where supported), *Park display* and *Panel lines off* (switch the display, or also its backlight and supplies, off at hand-over), *Boot log on screen* (show the boot's steps on screen and leave them there when the image starts), *SD card diagnostics* (log the SD slot's state around the SD card fixes), and *Reset OpenABL settings*, which deletes every setting OpenABL saved in misc, the device model too, and restarts into the bootloader with the defaults, without asking. |

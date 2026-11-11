@@ -61,6 +61,9 @@ typedef struct _SETTINGS {
   ABL_MODE  AblMode;
   // Volume up at boot starts external Linux instead of Android or Recovery.
   BOOLEAN     AltVolumeUp;
+  // The menu swaps Up and Down, for a device whose volume buttons point
+  // the other way from the screen.
+  BOOLEAN     ReverseVolume;
   BOOT_SOURCE BootSource;
   // Qualcomm's charger screen flag. It lives in devinfo, not in misc.
   BOOLEAN OffmodeCharging;
@@ -76,8 +79,6 @@ typedef struct _SETTINGS {
   BOOLEAN CustomLogo;
   // The menu's language, a LANG_ID from Ui/Lang.h. Stored as its Symbol.
   UINT8 Language;
-  // Reverse menu navigation for the volume buttons, whatever the rotation.
-  BOOLEAN ReverseVolume;
 
   // The menu shows its Developer options item. Set by pressing the
   // bootloader version in Device info seven times.
@@ -107,6 +108,7 @@ typedef struct _SETTINGS {
 #define SETTINGS_KEY_BOOT_MODE          "BootMode"
 #define SETTINGS_KEY_ABL_MODE           "AblMode"
 #define SETTINGS_KEY_ALT_VOLUME_UP      "AltVolumeUp"
+#define SETTINGS_KEY_REVERSE_VOLUME     "ReverseVolume"
 #define SETTINGS_KEY_BOOT_SOURCE        "BootSource"
 #define SETTINGS_KEY_ROTATION           "DisplayRotation"
 #define SETTINGS_KEY_MODEL              "DeviceModel"
@@ -114,7 +116,6 @@ typedef struct _SETTINGS {
 #define SETTINGS_KEY_MODEL_ROTATION_FOR "DeviceModelRotationFor"
 #define SETTINGS_KEY_CUSTOM_LOGO        "CustomLogo"
 #define SETTINGS_KEY_LANGUAGE           "MenuLanguage"
-#define SETTINGS_KEY_REVERSE_VOLUME     "ReverseVolume"
 #define SETTINGS_KEY_DEVELOPER_OPTIONS  "DeveloperOptions"
 #define SETTINGS_KEY_USB_HOST_LIVE      "UsbHostLive"
 #define SETTINGS_KEY_DISPLAY_OFF        "DisplayOff"

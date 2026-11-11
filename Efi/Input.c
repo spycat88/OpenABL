@@ -27,12 +27,14 @@ ReadKey (OUT INPUT *Out)
     }
     if (Key.ScanCode != SCAN_NULL) {
       switch (Key.ScanCode) {
+      // Qualcomm keypad drivers report volume up and down as SCAN_UP and
+      // SCAN_DOWN. Home and Delete stand in for them, as at power-on.
       case SCAN_UP:
-      case SCAN_VOLUME_UP:
+      case SCAN_HOME:
         *Out = INPUT_UP;
         return TRUE;
       case SCAN_DOWN:
-      case SCAN_VOLUME_DOWN:
+      case SCAN_DELETE:
         *Out = INPUT_DOWN;
         return TRUE;
       case SCAN_ESC:
@@ -100,12 +102,10 @@ InputKeysPoll (
     Any = TRUE;
     // The input is lost if memory runs out.
     if (KeysPress (&Keys->Decoder, Key, Now, &Decoded)) {
-      if (Keys->ReverseVolume) {
-        if (Decoded == INPUT_UP) {
-          Decoded = INPUT_DOWN;
-        } else if (Decoded == INPUT_DOWN) {
-          Decoded = INPUT_UP;
-        }
+      // Swapped after the decoder, which keeps the key as read, so a key
+      // muted at startup stays muted.
+      if (Keys->Reverse && (Decoded == INPUT_UP || Decoded == INPUT_DOWN)) {
+        Decoded = Decoded == INPUT_UP ? INPUT_DOWN : INPUT_UP;
       }
       (VOID)VecPush (Out, Decoded);
     }
