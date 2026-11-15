@@ -1287,15 +1287,17 @@ index 395087e..97b00ae 100644
  	}
 +!endif
 diff --git a/QcomModulePkg/QcomModulePkg.fdf b/QcomModulePkg/QcomModulePkg.fdf
-index 226f6fb..e9efd48 100755
+index 226f6fb..8d4aa33 100755
 --- a/QcomModulePkg/QcomModulePkg.fdf
 +++ b/QcomModulePkg/QcomModulePkg.fdf
-@@ -56,10 +56,11 @@
+@@ -56,10 +56,13 @@
  
  [FD.QcomModule_EFI]
  BaseAddress   = 0x80200000|gEmbeddedTokenSpaceGuid.PcdEmbeddedFdBaseAddress  #The base address of the FLASH Device.
 -Size          = 0x0003D000|gEmbeddedTokenSpaceGuid.PcdEmbeddedFdSize         #The size in bytes of the FLASH Device
-+# OpenABL: 512 KiB on every chip; abl_a/abl_b are 1 MiB on every device.
++# OpenABL: at most 512 KiB on every chip; abl_a/abl_b are 1 MiB on every
++# device. FVMAIN_COMPACT below is only as big as its contents, so the image
++# is not padded to this size; it is the limit GenFds checks the FV against.
 +Size          = 0x00080000|gEmbeddedTokenSpaceGuid.PcdEmbeddedFdSize         #The size in bytes of the FLASH Device
  ErasePolarity = 1
  BlockSize     = 0x200
@@ -1304,7 +1306,7 @@ index 226f6fb..e9efd48 100755
  
  ################################################################################
  #
-@@ -78,7 +79,7 @@ NumBlocks     = 0x1E8
+@@ -78,7 +81,7 @@ NumBlocks     = 0x1E8
  ################################################################################
  
  # 512 bytes of configuration header & 8 bytes of image header
@@ -1313,7 +1315,7 @@ index 226f6fb..e9efd48 100755
  gEmbeddedTokenSpaceGuid.PcdFlashFvMainBase|gEmbeddedTokenSpaceGuid.PcdFlashFvMainSize
  FV = FVMAIN_COMPACT
  
-@@ -115,6 +116,21 @@ READ_LOCK_STATUS   = TRUE
+@@ -115,8 +118,28 @@ READ_LOCK_STATUS   = TRUE
  FvNameGuid         = 046fae99-cf2e-49ed-a6a8-a1488b7e80d3
  
  INF QcomModulePkg/Application/LinuxLoader/LinuxLoader.inf
@@ -1334,7 +1336,14 @@ index 226f6fb..e9efd48 100755
 +!endif
  
  [FV.FVMAIN_COMPACT]
++# OpenABL: just big enough for its contents rather than the whole FD region
++# (the block size has to match the FD's). The makefile wraps this FV, not the
++# FD, in the ELF, so the image is only as big as what it holds.
++BlockSize          = 0x200
++NumBlocks          = 0
  FvAlignment        = 8
+ ERASE_POLARITY     = 1
+ MEMORY_MAPPED      = TRUE
 diff --git a/makefile b/makefile
 index 8904640..3e01979 100644
 --- a/makefile

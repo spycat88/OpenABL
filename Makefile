@@ -25,8 +25,8 @@
 # fonttools): Montserrat at two weights from Assets/Montserrat-Variable.ttf for
 # Latin, Greek and Cyrillic, and a CJK face from
 # Assets/SourceHanSansSC-Normal.otf for the rest.
-# The ABL image is 512 KiB and the abl partition 1 MiB, so the program is
-# kept small.
+# The ABL image can be at most 512 KiB (it is only as big as its contents)
+# and the abl partition is 1 MiB, so the program is kept small.
 #
 # `make sim` builds a host simulator that renders the menu's screens to PNG
 # (needs a host C compiler and zlib).
