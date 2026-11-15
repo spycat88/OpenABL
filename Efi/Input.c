@@ -27,11 +27,15 @@ ReadKey (OUT INPUT *Out)
     }
     if (Key.ScanCode != SCAN_NULL) {
       switch (Key.ScanCode) {
+      // Some keypads report the volume buttons as Home and Delete instead
+      // of Up and Down, as the power-on key checks already allow.
       case SCAN_UP:
+      case SCAN_HOME:
       case SCAN_VOLUME_UP:
         *Out = INPUT_UP;
         return TRUE;
       case SCAN_DOWN:
+      case SCAN_DELETE:
       case SCAN_VOLUME_DOWN:
         *Out = INPUT_DOWN;
         return TRUE;

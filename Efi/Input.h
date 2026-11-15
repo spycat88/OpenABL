@@ -6,7 +6,8 @@
 /**
   Input - maps firmware key events to UI inputs.
 
-  Up and volume up are Up, down and volume down are Down, Esc and Backspace
+  Up, Home and volume up are Up, Down, Delete and volume down are Down (some
+  keypads report the volume buttons as Home and Delete), Esc and Backspace
   are Back, and Enter, Space and SCAN_SUSPEND (the power key on Qualcomm
   keypads) are Select. Other keys are ignored. The input is reset after
   each read, so Qualcomm's keypad reports a held key again. Repeat and hold
