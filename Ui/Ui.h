@@ -117,6 +117,7 @@ typedef enum {
   ICON_USB,
   ICON_MONITOR_OFF,
   ICON_PLUG,
+  ICON_ARROWS_DOWN_UP,
   ICON_COUNT
 } ICON;
 

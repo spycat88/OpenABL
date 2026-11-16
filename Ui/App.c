@@ -713,7 +713,7 @@ AppItemView (
     AsciiStrCopy (Value, Cap, AltVolumeLabel (A));
     break;
   case ITEM_REVERSE_VOLUME:
-    View->Icon  = ICON_VOLUME;
+    View->Icon  = ICON_ARROWS_DOWN_UP;
     View->Label = gStrings->ReverseVolume;
     AsciiStrCopy (
       Value, Cap, Settings->ReverseVolume ? gStrings->On : gStrings->Off
