@@ -372,7 +372,8 @@ Acmd41Sites (VOID)
 // SdccDxe: the card's power-up time
 
 // Every SdccDxe build tries ACMD41 200 times, 5 ms apart, so a card has a
-// second to power up, and one still busy then is never found.
+// second to power up, and one still busy then is never found. 800 tries give
+// it four seconds, for every detection until the ABL boots.
 #define HIDE32(x)    ((UINT32)((x) ^ 0x5a5a5a5au))
 #define SETUP_WORDS  16
 #define LOOP_WORDS   32
@@ -397,9 +398,8 @@ Reveal32 (IN UINT32 Hidden)
 
 typedef struct _TRIES_WORD {
   UINT64  At;
-  UINT32  Built;
-  UINT32  Longer;
-  BOOLEAN Patched;
+  UINT32 Built;
+  UINT32 Longer;
 } TRIES_WORD;
 typedef struct _TRIES_WORDS
 OABL_VEC (TRIES_WORD) TRIES_WORDS;
@@ -467,7 +467,7 @@ TriesWords (VOID)
       );
       if (At != Delay) {
         Found = (TRIES_WORD){Start + At, Reveal32 (mCountDown[0]),
-                             Reveal32 (mCountDown[1]), FALSE};
+                             Reveal32 (mCountDown[1])};
       }
       for (UINTN Form = 0; Form < 2 && !Found.At; Form++) {
         At = FindWord (
@@ -475,7 +475,7 @@ TriesWords (VOID)
         );
         if (At != Len) {
           Found = (TRIES_WORD){Start + At, Reveal32 (mCountUp[Form][0]),
-                               Reveal32 (mCountUp[Form][1]), FALSE};
+                               Reveal32 (mCountUp[Form][1])};
         }
       }
       if (Found.At && !VecPush (&Words, Found)) {
@@ -1059,6 +1059,8 @@ SdCmdPullup (IN LOG_SINK Log)
 #define SD_SLOT     1ull
 #define SLOT_STRIDE 0x100ull
 
+// The first ACMD41 site, kept with Diagnostics on for QuirksPrepareStorage's
+// slot report. 0 otherwise.
 STATIC UINT64 mSdccSite;
 
 // Finds the base and size of the loaded image containing Addr.
@@ -1306,14 +1308,15 @@ QuirksSdccUhs (
     );
   }
   for (UINTN Index = 0; Index < Tries.Count; Index++) {
-    TRIES_WORD *Word = &Tries.Items[Index];
+    CONST TRIES_WORD *Word = &Tries.Items[Index];
+    BOOLEAN           Ok   =
+      WriteWord (Word->At, TRUE, Word->Built, Word->Longer);
 
-    Word->Patched = WriteWord (Word->At, TRUE, Word->Built, Word->Longer);
     LogPrint (
       Log, "sdcc: ACMD41 tries 200 -> 800 @0x%llx: %s", (UINT64)Word->At,
-      Word->Patched ? "patched" : "REFUSED"
+      Ok ? "patched" : "REFUSED"
     );
-    Longer += Word->Patched ? 1 : 0;
+    Longer += Ok ? 1 : 0;
   }
   if (Tries.Count == 0) {
     LogPrint (Log, "sdcc: no ACMD41 power-up limit found");
@@ -1668,16 +1671,25 @@ QuirksConnectAll (
 // sdcc_handle_is_mem_present (CMD13), sees the card is gone or reset, and
 // calls sdcc_handle_close. Issue a zero-byte ReadBlocks (SdccDxe's presence
 // check) on each removable raw BlockIo handle before QuirksSignalSdDetect so
-// a removed or swapped card's stale handle is closed first.
+// a removed or swapped card's stale handle is closed first. The buffer is a
+// page, so a driver's IoAlign check can't refuse the read before the
+// presence check. Other drivers do nothing, or (USB mass storage) check
+// their media.
 STATIC VOID
-SdccRefreshRemovableSlots (VOID)
+SdccRefreshRemovableSlots (IN LOG_SINK Log)
 {
-  EFI_HANDLE *Handles = NULL;
-  UINTN       Count   = LocateHandles (&gEfiBlockIoProtocolGuid, &Handles);
+  EFI_HANDLE          *Handles = NULL;
+  UINTN                Count   = 0;
+  EFI_PHYSICAL_ADDRESS Page;
 
+  if (gBS->AllocatePages (AllocateAnyPages, EfiLoaderData, 1, &Page) !=
+      EFI_SUCCESS) {
+    return;
+  }
+  Count = LocateHandles (&gEfiBlockIoProtocolGuid, &Handles);
   for (UINTN Index = 0; Index < Count; Index++) {
     EFI_BLOCK_IO_PROTOCOL *Bio = NULL;
-    UINT8                  Dummy;
+    EFI_STATUS             Status;
 
     if (EFI_ERROR (gBS->HandleProtocol (
           Handles[Index], &gEfiBlockIoProtocolGuid, (VOID **)&Bio
@@ -1687,11 +1699,20 @@ SdccRefreshRemovableSlots (VOID)
         !Bio->ReadBlocks) {
       continue;
     }
-    Bio->ReadBlocks (Bio, Bio->Media->MediaId, 0, 0, &Dummy);
+    Status =
+      Bio->ReadBlocks (Bio, Bio->Media->MediaId, 0, 0, (VOID *)(UINTN)Page);
+    // A card that is still there answers EFI_SUCCESS.
+    if (Status != EFI_SUCCESS) {
+      LogPrint (
+        Log, "sdcc: removable disk %llu presence check: %s", (UINT64)Index,
+        StatusText (Status, (CHAR8[STATUS_TEXT_SIZE]){0})
+      );
+    }
   }
   if (Handles) {
     gBS->FreePool (Handles);
   }
+  gBS->FreePages (Page, 1);
 }
 
 VOID
@@ -1700,7 +1721,7 @@ QuirksPrepareStorage (
   IN LOG_SINK Log
 )
 {
-  SdccRefreshRemovableSlots ();
+  SdccRefreshRemovableSlots (Log);
   QuirksSignalSdDetect ();
   if (mSdccSite != 0) {
     SdSlotReport (mSdccSite, "prepare", Log);

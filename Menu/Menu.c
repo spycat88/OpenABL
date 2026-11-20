@@ -659,7 +659,6 @@ DeviceInfo (
   UINT64                              CardSize;
   UINTN                               PmicCount;
 
-  QuirksPrepareStorage (QuirksChipId (), gMenuEfiLog);
   Push (&List, "SoC", SysInfoSoc ());
   if (QcomChip (&Chip)) {
     OABL_STRING Text = {0};
@@ -1075,8 +1074,13 @@ RunCommand (
     break;
   }
   case COMMAND_DEVICE_INFO: {
-    TEXT_LINE *Rows  = AllocateZeroArray (24, sizeof (*Rows));
-    UINTN      Count = Rows ? DeviceInfo (M, Rows, 24) : 0;
+    TEXT_LINE *Rows;
+    UINTN      Count;
+
+    // So the SD card row shows the card that is in the slot now.
+    QuirksPrepareStorage (QuirksChipId (), gMenuEfiLog);
+    Rows  = AllocateZeroArray (24, sizeof (*Rows));
+    Count = Rows ? DeviceInfo (M, Rows, 24) : 0;
 
     MenuLog ("device info: %llu lines", (UINT64)Count);
     for (UINTN Index = 0; Index < Count; Index++) {
