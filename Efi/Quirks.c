@@ -287,7 +287,9 @@ QuirksSignalSdDetect (VOID)
 // SdccDxe: the 1.8 V request
 
 // The movk that sets S18R in the ACMD41 argument and what follows it, in
-// the SM8250 and SM4450 builds. Stored XORed (HIDE).
+// the SM8250 and SM4450 builds. Stored XORed (HIDE). In the second form, the
+// instruction after the movk (mov w22, wzr) differs between builds, so it
+// isn't compared.
 STATIC CONST UINT8 mAcmd41[2][24] = {
   {HIDE (0x15), HIDE (0x00), HIDE (0x90), HIDE (0x52), HIDE (0xf5),
    HIDE (0x3f), HIDE (0xa8), HIDE (0x72), HIDE (0x00), HIDE (0x00),
@@ -302,15 +304,18 @@ STATIC CONST UINT8 mAcmd41[2][24] = {
 };
 STATIC CONST UINT8 mAcmd41Mask[2][24] = {
   {1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1},
-  {1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+  {1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1},
 };
 #define MOVK_AT         4
 #define MOVK_S18R_SET   0x72a83ff5u
 #define MOVK_S18R_CLEAR 0x72a81ff5u
 // Also sets XPC (OCR bit 28, SDXC power control).
 #define MOVK_XPC_S18R_CLEAR 0x72aa1ff5u
-// SM8650 and SM8750 chip ids, whose cards get XPC.
-STATIC CONST UINT32 mXpcChips[] = {682, 639, 706};
+// Chip ids whose cards get XPC: SM8250 (356), SM8550 (519, 536), G3x Gen 2
+// (601), QCS8550 (603), G3 Gen 3 (682), SM8750 (618), 8 Elite (639) and
+// Q8750 (706).
+STATIC CONST UINT32 mXpcChips[] = {356, 519, 536, 601, 603,
+                                   682, 618, 639, 706};
 #define MAX_SITES 16
 
 STATIC BOOLEAN
