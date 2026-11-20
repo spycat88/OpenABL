@@ -1056,6 +1056,9 @@ SdCmdPullup (IN LOG_SINK Log)
 #define SD_SLOT     1ull
 #define SLOT_STRIDE 0x100ull
 
+// The first ACMD41 site, kept with Diagnostics on for later slot reports.
+STATIC UINT64 mSdccSite;
+
 // Finds the base and size of the loaded image containing Addr.
 STATIC BOOLEAN
 ImageAround (
@@ -1357,7 +1360,8 @@ QuirksSdccUhs (
   (VOID)Base;
 #endif
   if (Diagnostics && Sites.Count > 0) {
-    SdSlotReport (Sites.Items[0], "before", Log);
+    mSdccSite = Sites.Items[0];
+    SdSlotReport (mSdccSite, "before", Log);
   }
 #ifdef OABL_SDCC_SM7675
   Pulled = Chip == SM7675_G2 && SdCmdPullup (Log);
@@ -1373,7 +1377,7 @@ QuirksSdccUhs (
   }
 #endif
   if (Diagnostics && Sites.Count > 0) {
-    SdSlotReport (Sites.Items[0], "after", Log);
+    SdSlotReport (mSdccSite, "after", Log);
   }
   VecFree (&Tries);
   VecFree (&Sites);
@@ -1657,13 +1661,50 @@ QuirksConnectAll (
   QuirksFatCache (Chip, Log);
 }
 
+// SdccDxe's DetectCard only opens the SD slot while its ClientHandle is
+// NULL. Once a card has been detected, removing or swapping it in the menu
+// leaves ClientHandle set until a BlockIo transfer runs
+// sdcc_handle_is_mem_present (CMD13), finds the card gone or reset, and calls
+// sdcc_handle_close. Issues a zero-byte ReadBlocks on each removable raw
+// BlockIo with media, so that a removed or swapped card's stale handle is
+// closed before detection runs. Other drivers ignore it, or (USB mass
+// storage) check their media.
+STATIC VOID
+SdccRefreshRemovableSlots (VOID)
+{
+  EFI_HANDLE *Handles = NULL;
+  UINTN       Count   = LocateHandles (&gEfiBlockIoProtocolGuid, &Handles);
+
+  for (UINTN Index = 0; Index < Count; Index++) {
+    EFI_BLOCK_IO_PROTOCOL *Bio = NULL;
+    UINT8                  Dummy;
+
+    if (EFI_ERROR (gBS->HandleProtocol (
+          Handles[Index], &gEfiBlockIoProtocolGuid, (VOID **)&Bio
+        )) ||
+        !Bio || !Bio->Media || !Bio->Media->RemovableMedia ||
+        Bio->Media->LogicalPartition || !Bio->Media->MediaPresent ||
+        !Bio->ReadBlocks) {
+      continue;
+    }
+    Bio->ReadBlocks (Bio, Bio->Media->MediaId, 0, 0, &Dummy);
+  }
+  if (Handles) {
+    gBS->FreePool (Handles);
+  }
+}
+
 VOID
 QuirksPrepareStorage (
   IN UINT32   Chip,
   IN LOG_SINK Log
 )
 {
+  SdccRefreshRemovableSlots ();
   QuirksSignalSdDetect ();
+  if (mSdccSite != 0) {
+    SdSlotReport (mSdccSite, "prepare", Log);
+  }
   QuirksConnectAll (Chip, Log);
 }
 

@@ -31,8 +31,8 @@
 // The OABL_SDCC_* builds patch more SdccDxe words, and the G2 Gen 2 also gets
 // its SD command line pull-up. On SM4450 a card that detection leaves
 // holding DAT low is power-cycled and detected again. With Diagnostics the
-// SD slot is logged before and after. Returns the number of S18R sites
-// patched.
+// SD slot is logged before and after, and at every QuirksPrepareStorage.
+// Returns the number of S18R sites patched.
 UINT32
 QuirksSdccUhs (
   IN UINT32   Chip,
@@ -75,8 +75,8 @@ QuirksConnectAll (
   IN LOG_SINK Log
 );
 
-// Gets storage ready to read: signals SD card detection, then
-// QuirksConnectAll.
+// Gets storage ready to read: lets SdccDxe notice a removed or swapped SD
+// card, signals SD card detection, then QuirksConnectAll.
 VOID
 QuirksPrepareStorage (
   IN UINT32   Chip,
