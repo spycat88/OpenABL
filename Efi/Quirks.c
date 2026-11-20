@@ -369,7 +369,8 @@ Acmd41Sites (VOID)
 // SdccDxe: the card's power-up time
 
 // Every SdccDxe build tries ACMD41 200 times, 5 ms apart, so a card has a
-// second to power up, and one still busy then is never found.
+// second to power up, and one still busy then is never found. 800 tries
+// give it four seconds, for every detection until the ABL boots.
 #define HIDE32(x)    ((UINT32)((x) ^ 0x5a5a5a5au))
 #define SETUP_WORDS  16
 #define LOOP_WORDS   32
@@ -393,10 +394,9 @@ Reveal32 (IN UINT32 Hidden)
 }
 
 typedef struct _TRIES_WORD {
-  UINT64  At;
-  UINT32  Built;
-  UINT32  Longer;
-  BOOLEAN Patched;
+  UINT64 At;
+  UINT32 Built;
+  UINT32 Longer;
 } TRIES_WORD;
 typedef struct _TRIES_WORDS
 OABL_VEC (TRIES_WORD) TRIES_WORDS;
@@ -464,7 +464,7 @@ TriesWords (VOID)
       );
       if (At != Delay) {
         Found = (TRIES_WORD){Start + At, Reveal32 (mCountDown[0]),
-                             Reveal32 (mCountDown[1]), FALSE};
+                             Reveal32 (mCountDown[1])};
       }
       for (UINTN Form = 0; Form < 2 && !Found.At; Form++) {
         At = FindWord (
@@ -472,7 +472,7 @@ TriesWords (VOID)
         );
         if (At != Len) {
           Found = (TRIES_WORD){Start + At, Reveal32 (mCountUp[Form][0]),
-                               Reveal32 (mCountUp[Form][1]), FALSE};
+                               Reveal32 (mCountUp[Form][1])};
         }
       }
       if (Found.At && !VecPush (&Words, Found)) {
@@ -1301,14 +1301,15 @@ QuirksSdccUhs (
     );
   }
   for (UINTN Index = 0; Index < Tries.Count; Index++) {
-    TRIES_WORD *Word = &Tries.Items[Index];
+    CONST TRIES_WORD *Word = &Tries.Items[Index];
+    BOOLEAN           Ok   =
+      WriteWord (Word->At, TRUE, Word->Built, Word->Longer);
 
-    Word->Patched = WriteWord (Word->At, TRUE, Word->Built, Word->Longer);
     LogPrint (
       Log, "sdcc: ACMD41 tries 200 -> 800 @0x%llx: %s", (UINT64)Word->At,
-      Word->Patched ? "patched" : "REFUSED"
+      Ok ? "patched" : "REFUSED"
     );
-    Longer += Word->Patched ? 1 : 0;
+    Longer += Ok ? 1 : 0;
   }
   if (Tries.Count == 0) {
     LogPrint (Log, "sdcc: no ACMD41 power-up limit found");
@@ -1365,19 +1366,6 @@ QuirksSdccUhs (
   if (Detected) {
     // Detection runs inside SignalEvent, as its notify TPL is above ours.
     QuirksSignalSdDetect ();
-  }
-  for (UINTN Index = 0; Index < Tries.Count; Index++) {
-    CONST TRIES_WORD *Word = &Tries.Items[Index];
-    BOOLEAN           Ok;
-
-    if (!Word->Patched) {
-      continue;
-    }
-    Ok = WriteWord (Word->At, TRUE, Word->Longer, Word->Built);
-    LogPrint (
-      Log, "sdcc: ACMD41 tries back to 200 @0x%llx: %s", (UINT64)Word->At,
-      Ok ? "done" : "REFUSED"
-    );
   }
 #ifdef OABL_SDCC_SM4450
   if (Detected && Base && Chip == SM4450 && SdStuck ()) {
