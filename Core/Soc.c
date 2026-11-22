@@ -9,38 +9,74 @@
 
 #include "Core/Soc.h"
 
-// Sorted by id. Linux names SoCs by their part number; the SoC string comes
-// after the board's in a root compatible list, as in "ayntec,odin2mini",
-// "qcom,qcs8550", "qcom,sm8550".
+#include "Core/EfiData.h"
+
+#define RT_NO_VMAP (UEFI_RT_SET_VIRTUAL_ADDRESS_MAP | UEFI_RT_CONVERT_POINTER)
+
+// Sorted by id.
 STATIC CONST SOC_INFO mSocs[] = {
-  {321, "Snapdragon 845", {"qcom,sdm845"}},
+  // SetVirtualAddressMap hangs on SDM845 (a runtime driver fails an
+  // ASSERT), and EFI runtime shutdown is broken, so Linux uses PSCI for
+  // reset and shutdown.
+  {321, "Snapdragon 845", SOC_FAMILY_SDM845, RT_NO_VMAP | UEFI_RT_RESET_SYSTEM},
   // SDA845
-  {341, NULL, {"qcom,sdm845"}},
-  {356, "Snapdragon 865", {"qcom,sm8250"}},
-  {444, "Snapdragon 662", {"qcom,sm6115"}},
-  {467, "Dragonwing QCS6125", {"qcom,sm6115"}},
+  {341, NULL, SOC_FAMILY_SDM845, RT_NO_VMAP},
+  {356, "Snapdragon 865", SOC_FAMILY_SM8250, 0},
+  // SetVirtualAddressMap hangs on SM6115 too, and its XBL runtime code is
+  // in the ADSP carveout, so none of it can be called.
+  {444, "Snapdragon 662", SOC_FAMILY_SM6115, UEFI_RT_ALL},
+  // The Kamorta IoT part.
+  {467, "Dragonwing QCS6125", SOC_FAMILY_SM6115, RT_NO_VMAP},
   // SM8550
-  {519, NULL, {"qcom,sm8550"}},
-  // SM8475, SM8475P and SM8475_2. Linux has no SM8475 devicetrees, and
-  // ports build on SM8450's.
-  {530, NULL, {"qcom,sm8475", "qcom,sm8450"}},
-  {531, "Snapdragon 8+ Gen 1", {"qcom,sm8475", "qcom,sm8450"}},
-  {540, NULL, {"qcom,sm8475", "qcom,sm8450"}},
+  {519, NULL, SOC_FAMILY_SM8550, 0},
+  // SM8475
+  {530, NULL, SOC_FAMILY_SM8475, 0},
+  // SM8475P
+  {531, "Snapdragon 8+ Gen 1", SOC_FAMILY_SM8475, 0},
+  // SM8475_2
+  {540, NULL, SOC_FAMILY_SM8475, 0},
   // SM8650
-  {557, NULL, {"qcom,sm8650"}},
+  {557, NULL, SOC_FAMILY_SM8650, 0},
   // SM4450
-  {568, NULL, {"qcom,sm4450"}},
-  {601, "Snapdragon G3x Gen 2", {"qcom,sm8550"}},
-  {603, "Dragonwing QCS8550", {"qcom,sm8550"}},
+  {568, NULL, SOC_FAMILY_SM4450, 0},
+  {601, "Snapdragon G3x Gen 2", SOC_FAMILY_SM8550, 0},
+  {603, "Dragonwing QCS8550", SOC_FAMILY_SM8550, 0},
   // SM8750
-  {618, NULL, {"qcom,sm8750"}},
-  {634, "Snapdragon G2 Gen 1", {"qcom,sm6450"}},
-  {639, "Snapdragon 8 Elite", {"qcom,sm8750"}},
-  {654, "Snapdragon G1 Gen 2", {"qcom,sm4450"}},
-  {682, "Snapdragon G3 Gen 3", {"qcom,sm8650"}},
-  {700, "Snapdragon G2 Gen 2", {"qcom,sm7675"}},
-  {706, "Dragonwing Q8750", {"qcom,sm8750"}},
-  {732, "Dragonwing Q7790", {NULL}},
+  {618, NULL, SOC_FAMILY_SM8750, 0},
+  // TG4070
+  {634, "Snapdragon G2 Gen 1", SOC_FAMILY_SM6450, 0},
+  {639, "Snapdragon 8 Elite", SOC_FAMILY_SM8750, 0},
+  {654, "Snapdragon G1 Gen 2", SOC_FAMILY_SM4450, 0},
+  {682, "Snapdragon G3 Gen 3", SOC_FAMILY_SM8650, 0},
+  // RP G2, with a Cliffs XBL.
+  {700, "Snapdragon G2 Gen 2", SOC_FAMILY_SM7675, 0},
+  {706, "Dragonwing Q8750", SOC_FAMILY_SM8750, 0},
+  {732, "Dragonwing Q7790", SOC_FAMILY_UNKNOWN, 0},
+};
+
+#define NAMES_MAX       2
+#define COMPATIBLES_MAX 2
+
+// How ChipInfo names a family's SoCs, by prefix, and the root compatibles
+// of their Linux devicetrees. Linux names SoCs by their part number, after
+// the board in the list, as in "ayntec,odin2mini", "qcom,qcs8550",
+// "qcom,sm8550". Unused entries are NULL.
+STATIC CONST struct {
+  CONST CHAR8 *Names[NAMES_MAX];
+  CONST CHAR8 *Compatibles[COMPATIBLES_MAX];
+} mFamilies[SOC_FAMILY_COUNT] = {
+  [SOC_FAMILY_SDM845] = {{"SDM845", "SDA845"}, {"qcom,sdm845"}},
+  [SOC_FAMILY_SM6115] = {{"SM6115"}, {"qcom,sm6115"}},
+  [SOC_FAMILY_SM8250] = {{"SM8250"}, {"qcom,sm8250"}},
+  [SOC_FAMILY_SM4450] = {{"SM4450"}, {"qcom,sm4450"}},
+  [SOC_FAMILY_SM6450] = {{"SM6450"}, {"qcom,sm6450"}},
+  // Only id 700, the G2 Gen 2 with a Cliffs XBL, is known to be like it.
+  [SOC_FAMILY_SM7675] = {{NULL}, {"qcom,sm7675"}},
+  // Linux has no SM8475 devicetrees, and ports build on SM8450's.
+  [SOC_FAMILY_SM8475] = {{"SM8475"}, {"qcom,sm8475", "qcom,sm8450"}},
+  [SOC_FAMILY_SM8550] = {{"SM8550"}, {"qcom,sm8550"}},
+  [SOC_FAMILY_SM8650] = {{"SM8650"}, {"qcom,sm8650"}},
+  [SOC_FAMILY_SM8750] = {{"SM8750"}, {"qcom,sm8750"}},
 };
 
 CONST SOC_INFO *
@@ -54,18 +90,53 @@ SocById (IN UINT32 Id)
   return NULL;
 }
 
-BOOLEAN
-SocHasCompatibles (IN CONST SOC_INFO *Soc)
+SOC_FAMILY
+SocFamilyOf (
+  IN UINT32       Id,
+  IN CONST CHAR8 *Name OPTIONAL
+)
 {
-  return Soc && Soc->Compatibles[0];
+  CONST SOC_INFO *Soc = SocById (Id);
+  OABL_TEXT       Chip;
+
+  if (Soc && Soc->Family != SOC_FAMILY_UNKNOWN) {
+    return Soc->Family;
+  }
+  Chip = TextTrim (TextOf (Name));
+  for (UINTN Family = 0; Family < SOC_FAMILY_COUNT; Family++) {
+    for (UINTN Index = 0; Index < NAMES_MAX && mFamilies[Family].Names[Index];
+         Index++) {
+      if (TextStartsWith (Chip, mFamilies[Family].Names[Index])) {
+        return (SOC_FAMILY)Family;
+      }
+    }
+  }
+  return SOC_FAMILY_UNKNOWN;
+}
+
+UINT32
+SocRuntimeGaps (IN UINT32 Id)
+{
+  CONST SOC_INFO *Soc = SocById (Id);
+
+  return Soc ? Soc->RuntimeGaps : 0;
+}
+
+BOOLEAN
+SocHasCompatibles (IN SOC_FAMILY Family)
+{
+  return Family < SOC_FAMILY_COUNT && mFamilies[Family].Compatibles[0];
 }
 
 BOOLEAN
 SocMatches (
-  IN CONST SOC_INFO *Soc,
-  IN OABL_BYTES      List
+  IN SOC_FAMILY Family,
+  IN OABL_BYTES List
 )
 {
+  if (!SocHasCompatibles (Family)) {
+    return FALSE;
+  }
   for (UINTN At = 0; At < List.Len;) {
     UINTN End = At;
 
@@ -76,10 +147,11 @@ SocMatches (
       return FALSE;
     }
     for (UINTN Index = 0;
-         Index < SOC_COMPATIBLES_MAX && Soc->Compatibles[Index]; Index++) {
+         Index < COMPATIBLES_MAX && mFamilies[Family].Compatibles[Index];
+         Index++) {
       if (TextEqStr (
             (OABL_TEXT){(CONST CHAR8 *)List.Ptr + At, End - At},
-            Soc->Compatibles[Index]
+            mFamilies[Family].Compatibles[Index]
           )) {
         return TRUE;
       }

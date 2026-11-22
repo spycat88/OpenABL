@@ -70,15 +70,15 @@ IsKnown (
   return FALSE;
 }
 
-// Adds Region's models for Soc (any SoC if NULL) that aren't in Found yet.
-// Returns how many; *Trees counts the devicetrees read and *Others those
-// for another SoC.
+// Adds Region's models for Soc (any SoC if SOC_FAMILY_UNKNOWN) that aren't in
+// Found yet. Returns how many; *Trees counts the devicetrees read and *Others
+// those for another SoC.
 STATIC UINTN
 AddModels (
   IN OUT SCANNED_MODELS *Found,
   IN CONST UINT8        *Region,
   IN UINTN               Size,
-  IN CONST SOC_INFO     *Soc OPTIONAL,
+  IN SOC_FAMILY          Soc,
   IN OUT UINTN          *Trees,
   IN OUT UINTN          *Others
 )
@@ -96,7 +96,7 @@ AddModels (
       continue;
     }
     (*Trees)++;
-    if (Soc &&
+    if (Soc != SOC_FAMILY_UNKNOWN &&
         !(DtPropAt (Blob, Dtbs.Items[Index].Size, 0, "compatible", &List) &&
           SocMatches (Soc, List))) {
       (*Others)++;
@@ -236,10 +236,10 @@ ReadDtbs (
 // State for ModelsScan's walk of one folder.
 typedef struct _SCAN_VISIT {
   SCANNED_MODELS *Found;
-  // The running SoC, or NULL to take every model.
-  CONST SOC_INFO *Soc;
-  UINTN           Trees;
-  UINTN           Others;
+  // The running SoC's family, or SOC_FAMILY_UNKNOWN to take every model.
+  SOC_FAMILY Soc;
+  UINTN      Trees;
+  UINTN      Others;
 } SCAN_VISIT;
 
 // Reads the whole file only for a model of this SoC not found yet, which
@@ -259,7 +259,7 @@ ScanWant (
   if (!Peek->HasModel) {
     return FALSE;
   }
-  if (Scan->Soc &&
+  if (Scan->Soc != SOC_FAMILY_UNKNOWN &&
       !(Peek->HasCompatible && SocMatches (Scan->Soc, Peek->Compatible))) {
     Scan->Trees++;
     Scan->Others++;
@@ -371,14 +371,14 @@ ModelsScan (
   IN OUT SCANNED_MODELS *Out
 )
 {
-  UINT32          Chip = QuirksChipId ();
-  CONST SOC_INFO *Soc  = SocById (Chip);
+  UINT32     Chip = QuirksChipId ();
+  SOC_FAMILY Soc  = SocFamilyOf (Chip, NULL);
 
   if (!SocHasCompatibles (Soc)) {
     LogPrint (
       Log, "scan: no SoC compatible for chip id %u; showing all models", Chip
     );
-    Soc = NULL;
+    Soc = SOC_FAMILY_UNKNOWN;
   }
   for (UINTN Drive = 0; Drive < Count; Drive++) {
     for (UINTN Dir = 0; Dir < N_DTB_DIRS; Dir++) {

@@ -22,6 +22,7 @@
 #include "Base/Memory.h"
 #include "Core/Carveouts.h"
 #include "Core/EfiData.h"
+#include "Core/Soc.h"
 #include "Efi/DisplayHandover.h"
 #include "Efi/DtFixup.h"
 #include "Efi/Dxe.h"
@@ -465,26 +466,8 @@ AllocateOutsideCarveouts (
 }
 
 // Firmware tables for the OS: an ESRT with the ABL's version, and on chips
-// whose XBL lacks runtime services an EFI_RT_PROPERTIES_TABLE that says
-// which.
-
-#define RT_NO_VMAP (UEFI_RT_SET_VIRTUAL_ADDRESS_MAP | UEFI_RT_CONVERT_POINTER)
-
-// The runtime services XBL lacks, by ChipInfo id: SDM845, SDA845, SM6115,
-// QCS6125. SetVirtualAddressMap hangs on SDM845 (a runtime driver fails an
-// ASSERT) and SM6115. On SM6115 XBL's runtime code is in the ADSP
-// carveout, so none can be called.
-STATIC CONST struct {
-  UINT32 ChipId;
-  UINT32 Unsupported;
-} mRuntimeGaps[] = {
-  // EFI runtime shutdown is broken on SDM845.
-  // Let kernel use PSCI for reset/shutdown.
-  {321, RT_NO_VMAP | UEFI_RT_RESET_SYSTEM},
-  {341, RT_NO_VMAP},
-  {444, UEFI_RT_ALL},
-  {467, RT_NO_VMAP},
-};
+// whose XBL lacks runtime services (by Core/Soc) an EFI_RT_PROPERTIES_TABLE
+// that says which.
 
 STATIC EFI_GUID mRtPropertiesGuid = {
   0xeb66918a,
@@ -510,19 +493,6 @@ ChipId (VOID)
   QCOM_CHIP Chip;
 
   return QcomChip (&Chip) && Chip.Id.Status == EFI_SUCCESS ? Chip.Id.Value : 0;
-}
-
-// The runtime services XBL lacks on chip Id, or 0 if it isn't listed.
-STATIC UINT32
-RuntimeGaps (IN UINT32 Id)
-{
-  for (UINTN Index = 0; Index < sizeof (mRuntimeGaps) / sizeof (*mRuntimeGaps);
-       Index++) {
-    if (Id == mRuntimeGaps[Index].ChipId) {
-      return mRuntimeGaps[Index].Unsupported;
-    }
-  }
-  return 0;
 }
 
 // Installs Size bytes (up to a page) from Data as configuration table Guid,
@@ -558,7 +528,7 @@ FirmwareTables (
   STATIC VOID *RtKept;
   STATIC VOID *EsrtKept;
   UINT32       Id   = ChipId ();
-  UINT32       Gaps = RuntimeGaps (Id);
+  UINT32       Gaps = SocRuntimeGaps (Id);
   UINT8        Rt[8];
   UINT8        Esrt[UEFI_ESRT_ONE_SIZE];
   EFI_GUID     Class = mAblClass;
@@ -600,9 +570,9 @@ Refuse (
   return EFI_UNSUPPORTED;
 }
 
-// Makes SetVirtualAddressMap refuse on the chips mRuntimeGaps lists, for
-// loaders that ignore the runtime properties table. Linux's stub then
-// keeps the runtime services at their physical addresses, as with
+// Makes SetVirtualAddressMap refuse on the chips whose XBL lacks it (by
+// Core/Soc), for loaders that ignore the runtime properties table. Linux's
+// stub then keeps the runtime services at their physical addresses, as with
 // efi=novamap. Refuse is in our image, which stays intact until the OS
 // reuses the memory.
 STATIC VOID
@@ -610,7 +580,7 @@ VirtualMapRefuseOnTheseChips (IN LOG_SINK Log)
 {
   EFI_RUNTIME_SERVICES *Rt;
 
-  if (!(RuntimeGaps (ChipId ()) & UEFI_RT_SET_VIRTUAL_ADDRESS_MAP)) {
+  if (!(SocRuntimeGaps (ChipId ()) & UEFI_RT_SET_VIRTUAL_ADDRESS_MAP)) {
     return;
   }
   // The table is in writable runtime data.
@@ -1063,8 +1033,7 @@ ReleaseDeadRegions (
       continue;
     }
     if (mDeadRegions[Index].ReservedOnly) {
-      Freed =
-        ReleaseReserved (Base, Len, &Display, mDeadRegions[Index].Type);
+      Freed = ReleaseReserved (Base, Len, &Display, mDeadRegions[Index].Type);
       LogPrint (
         Log, "handover: release %s @0x%llx 0x%llx (reserved parts): %llu KiB",
         mDeadRegions[Index].Name, (UINT64)Base, (UINT64)Len, Freed / 1024

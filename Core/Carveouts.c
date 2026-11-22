@@ -9,7 +9,7 @@
 
 #include "Core/Carveouts.h"
 
-#include "Base/Text.h"
+#include "Core/Soc.h"
 
 // The entry comments come from SocCarveoutTable.h.
 
@@ -272,47 +272,26 @@ CarveoutsForChip (
   IN CONST CHAR8 *Name OPTIONAL
 )
 {
-  STATIC CONST struct {
-    CONST CHAR8           *Prefix;
-    CONST CARVEOUTS_TABLE *Table;
-  } ByName[] = {
-    {"SM4450", &gCarveoutsSm4450}, {"SM6450", &gCarveoutsSm6450},
-    {"SM8250", &gCarveoutsSm8250}, {"SM8550", &gCarveoutsSm8550},
-    {"SM8650", &gCarveoutsSm8650}, {"SM8750", &gCarveoutsSm8750},
-    {"SM6115", &gCarveoutsSm6115}, {"SDM845", &gCarveoutsSdm845},
-    {"SDA845", &gCarveoutsSdm845},
-  };
-  OABL_TEXT Chip;
-
-  switch (ChipId) {
-  case 654:
-    return &gCarveoutsSm4450;
-  case 634:
-    return &gCarveoutsSm6450;
-  case 356:
-    return &gCarveoutsSm8250;
-  case 601:
-  case 603:
-    return &gCarveoutsSm8550;
-  case 682:
-    return &gCarveoutsSm8650;
-  case 639:
-  case 706:
-    return &gCarveoutsSm8750;
-  case 444:
-  case 467:
-    return &gCarveoutsSm6115;
-  case 321:
-  case 341:
+  switch (SocFamilyOf (ChipId, Name)) {
+  case SOC_FAMILY_SDM845:
     return &gCarveoutsSdm845;
+  case SOC_FAMILY_SM6115:
+    return &gCarveoutsSm6115;
+  case SOC_FAMILY_SM8250:
+    return &gCarveoutsSm8250;
+  case SOC_FAMILY_SM4450:
+    return &gCarveoutsSm4450;
+  case SOC_FAMILY_SM6450:
+    return &gCarveoutsSm6450;
+  case SOC_FAMILY_SM8550:
+    return &gCarveoutsSm8550;
+  case SOC_FAMILY_SM8650:
+    return &gCarveoutsSm8650;
+  case SOC_FAMILY_SM8750:
+    return &gCarveoutsSm8750;
+  default:
+    return NULL;
   }
-  Chip = TextTrim (TextOf (Name));
-  for (UINTN Index = 0; Index < sizeof (ByName) / sizeof (*ByName); Index++) {
-    if (TextStartsWith (Chip, ByName[Index].Prefix)) {
-      return ByName[Index].Table;
-    }
-  }
-  return NULL;
 }
 
 // XBL's splash framebuffer (Display Reserved) is never handed over, since
