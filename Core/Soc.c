@@ -18,40 +18,44 @@ STATIC CONST SOC_INFO mSocs[] = {
   // SetVirtualAddressMap hangs on SDM845 (a runtime driver fails an
   // ASSERT), and EFI runtime shutdown is broken, so Linux uses PSCI for
   // reset and shutdown.
-  {321, "Snapdragon 845", SOC_FAMILY_SDM845, RT_NO_VMAP | UEFI_RT_RESET_SYSTEM},
+  {321, "Snapdragon 845", SOC_FAMILY_SDM845, RT_NO_VMAP | UEFI_RT_RESET_SYSTEM,
+   0},
   // SDA845
-  {341, NULL, SOC_FAMILY_SDM845, RT_NO_VMAP},
-  {356, "Snapdragon 865", SOC_FAMILY_SM8250, 0},
+  {341, NULL, SOC_FAMILY_SDM845, RT_NO_VMAP, 0},
+  {356, "Snapdragon 865", SOC_FAMILY_SM8250, 0,
+   SOC_QUIRK_GPT_FAT | SOC_QUIRK_SD_XPC},
   // SetVirtualAddressMap hangs on SM6115 too, and its XBL runtime code is
   // in the ADSP carveout, so none of it can be called.
-  {444, "Snapdragon 662", SOC_FAMILY_SM6115, UEFI_RT_ALL},
+  {444, "Snapdragon 662", SOC_FAMILY_SM6115, UEFI_RT_ALL, 0},
   // The Kamorta IoT part.
-  {467, "Dragonwing QCS6125", SOC_FAMILY_SM6115, RT_NO_VMAP},
+  {467, "Dragonwing QCS6125", SOC_FAMILY_SM6115, RT_NO_VMAP, 0},
   // SM8550
-  {519, NULL, SOC_FAMILY_SM8550, 0},
+  {519, NULL, SOC_FAMILY_SM8550, 0, SOC_QUIRK_SD_XPC},
   // SM8475
-  {530, NULL, SOC_FAMILY_SM8475, 0},
+  {530, NULL, SOC_FAMILY_SM8475, 0, 0},
   // SM8475P
-  {531, "Snapdragon 8+ Gen 1", SOC_FAMILY_SM8475, 0},
+  {531, "Snapdragon 8+ Gen 1", SOC_FAMILY_SM8475, 0, 0},
+  // In the SD XPC list, but not in Linux's ids.
+  {536, NULL, SOC_FAMILY_UNKNOWN, 0, SOC_QUIRK_SD_XPC},
   // SM8475_2
-  {540, NULL, SOC_FAMILY_SM8475, 0},
+  {540, NULL, SOC_FAMILY_SM8475, 0, 0},
   // SM8650
-  {557, NULL, SOC_FAMILY_SM8650, 0},
+  {557, NULL, SOC_FAMILY_SM8650, 0, 0},
   // SM4450
-  {568, NULL, SOC_FAMILY_SM4450, 0},
-  {601, "Snapdragon G3x Gen 2", SOC_FAMILY_SM8550, 0},
-  {603, "Dragonwing QCS8550", SOC_FAMILY_SM8550, 0},
+  {568, NULL, SOC_FAMILY_SM4450, 0, 0},
+  {601, "Snapdragon G3x Gen 2", SOC_FAMILY_SM8550, 0, SOC_QUIRK_SD_XPC},
+  {603, "Dragonwing QCS8550", SOC_FAMILY_SM8550, 0, SOC_QUIRK_SD_XPC},
   // SM8750
-  {618, NULL, SOC_FAMILY_SM8750, 0},
+  {618, NULL, SOC_FAMILY_SM8750, 0, SOC_QUIRK_SD_XPC},
   // TG4070
-  {634, "Snapdragon G2 Gen 1", SOC_FAMILY_SM6450, 0},
-  {639, "Snapdragon 8 Elite", SOC_FAMILY_SM8750, 0},
-  {654, "Snapdragon G1 Gen 2", SOC_FAMILY_SM4450, 0},
-  {682, "Snapdragon G3 Gen 3", SOC_FAMILY_SM8650, 0},
+  {634, "Snapdragon G2 Gen 1", SOC_FAMILY_SM6450, 0, SOC_QUIRK_SDCC_SM6450},
+  {639, "Snapdragon 8 Elite", SOC_FAMILY_SM8750, 0, SOC_QUIRK_SD_XPC},
+  {654, "Snapdragon G1 Gen 2", SOC_FAMILY_SM4450, 0, SOC_QUIRK_SDCC_SM4450},
+  {682, "Snapdragon G3 Gen 3", SOC_FAMILY_SM8650, 0, SOC_QUIRK_SD_XPC},
   // RP G2, with a Cliffs XBL.
-  {700, "Snapdragon G2 Gen 2", SOC_FAMILY_SM7675, 0},
-  {706, "Dragonwing Q8750", SOC_FAMILY_SM8750, 0},
-  {732, "Dragonwing Q7790", SOC_FAMILY_UNKNOWN, 0},
+  {700, "Snapdragon G2 Gen 2", SOC_FAMILY_SM7675, 0, SOC_QUIRK_SDCC_SM7675},
+  {706, "Dragonwing Q8750", SOC_FAMILY_SM8750, 0, SOC_QUIRK_SD_XPC},
+  {732, "Dragonwing Q7790", SOC_FAMILY_UNKNOWN, 0, 0},
 };
 
 #define NAMES_MAX       2
@@ -112,6 +116,14 @@ SocFamilyOf (
     }
   }
   return SOC_FAMILY_UNKNOWN;
+}
+
+UINT32
+SocQuirks (IN UINT32 Id)
+{
+  CONST SOC_INFO *Soc = SocById (Id);
+
+  return Soc ? Soc->Quirks : 0;
 }
 
 UINT32
