@@ -328,7 +328,7 @@ ReadUkiDtbs (
     if (FilesReadPeSections (Fs, Path, &Sections, NULL) &&
         PeFind (Sections.Items, Sections.Count, ".linux")) {
       for (UINTN Index2 = 0; Index2 < Sections.Count && !Stop; Index2++) {
-        DTB_SOURCE Source = {Path};
+        DTB_SOURCE Source = {Path, 0, 0};
 
         if (!IsDtbSection (Sections.Items[Index2].Name)) {
           continue;
