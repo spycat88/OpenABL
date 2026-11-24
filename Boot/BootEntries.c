@@ -21,8 +21,12 @@
 
 // Size limit for entry files and loader.conf.
 #define TEXT_LIMIT ((UINTN)64 << 10)
-// Bytes read from the start of a UKI to get its section table.
+// Bytes first read from the start of a UKI. Enough for the section table
+// of most UKIs; bigger ones are read again at the size they need.
 #define PE_HEAD 4096
+// Largest section table read. A UKI with one .dtbauto section per device
+// can pass PE_HEAD; the format allows up to about 2.6 MiB.
+#define PE_HEAD_MAX ((UINTN)1 << 20)
 
 CONST CHAR8 *
 BootEntriesVolumeKind (IN CONST BOOT_ENTRIES_VOLUME *V)
@@ -200,6 +204,7 @@ UkiEntries (
     CHAR8       *Path;
     CHAR8       *Osrel;
     CHAR8       *Uname;
+    UINTN        Needed;
 
     if (List.Items[Index].IsDir ||
         !TextEndsWithNoCase (TextOf (Name), ".efi")) {
@@ -212,6 +217,17 @@ UkiEntries (
     if (!FilesReadPart (Fs, Path, 0, PE_HEAD, &Head)) {
       FreePool (Path);
       continue;
+    }
+    if (PeHeadersSize (Head.Data, Head.Len, &Needed) && Needed > Head.Len) {
+      BufferFree (&Head);
+      if (Needed > PE_HEAD_MAX ||
+          !FilesReadPart (Fs, Path, 0, Needed, &Head)) {
+        SerialLog (
+          "  %s: section table too large or unreadable; skipped", Path
+        );
+        FreePool (Path);
+        continue;
+      }
     }
     if (!PeSections (Head.Data, Head.Len, &Sections)) {
       SerialLog ("  %s: not a PE image; skipped", Path);
