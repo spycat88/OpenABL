@@ -46,8 +46,8 @@ extern CONST CARVEOUTS_TABLE gCarveoutsSm6115;
 // hypervisor, TZ and remote processor memory to the OS.
 extern CONST CARVEOUTS_TABLE gCarveoutsSdm845;
 
-// Returns the table for a ChipInfo chip id, or by Name if the id isn't
-// known. NULL means reclaim from the banks alone.
+// Returns the table Core/Soc.c gives a ChipInfo chip id, or by Name if the
+// id has none. NULL means reclaim from the banks alone.
 CONST CARVEOUTS_TABLE *
 CarveoutsForChip (
   IN UINT32       ChipId,

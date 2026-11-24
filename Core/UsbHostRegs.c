@@ -10,7 +10,7 @@
 #include "Core/UsbHostRegs.h"
 
 #include "Base/Print.h"
-#include "Base/Text.h"
+#include "Core/Soc.h"
 
 BOOLEAN
 UsbHostBoardOf (
@@ -19,50 +19,16 @@ UsbHostBoardOf (
   OUT USB_HOST_BOARD *Out
 )
 {
-  STATIC CONST CHAR8 *CONST Glink[] = {"SM4450", "SM6450", "SM8475", "SM8550",
-                                       "SM8650", "SM8750"};
-  OABL_TEXT                 Trimmed;
+  CONST SOC_INFO *Soc = SocById (ChipId);
 
-  switch (ChipId) {
-  case 356:
-    *Out = USB_HOST_BOARD_SM8250;
-    return TRUE;
-  // Snapdragon 662, and QCS6125, the Kamorta IoT part.
-  case 444:
-  case 467:
-    *Out = USB_HOST_BOARD_SM6115;
-    return TRUE;
-  // G1 Gen 2 (SM4450), G2 Gen 1 (SM6450), G2 Gen 2 (Cliffs XBL, with
-  // PmicGlinkDxe and the ADSP, DWC3 at 0xa600000), 8+ Gen 1 (SM8475),
-  // QCS8550 and G3x Gen 2, G3 Gen 3 (SM8650), 8 Elite and Q8750.
-  case 654:
-  case 634:
-  case 700:
-  case 531:
-  case 601:
-  case 603:
-  case 682:
-  case 639:
-  case 706:
-    *Out = USB_HOST_BOARD_GLINK;
-    return TRUE;
+  if (!Soc || Soc->UsbHost == USB_HOST_BOARD_NONE) {
+    Soc = SocByName (Name);
   }
-  Trimmed = TextTrim (TextOf (Name));
-  if (TextStartsWith (Trimmed, "SM8250")) {
-    *Out = USB_HOST_BOARD_SM8250;
-    return TRUE;
+  if (!Soc || Soc->UsbHost == USB_HOST_BOARD_NONE) {
+    return FALSE;
   }
-  if (TextStartsWith (Trimmed, "SM6115")) {
-    *Out = USB_HOST_BOARD_SM6115;
-    return TRUE;
-  }
-  for (UINTN Index = 0; Index < sizeof (Glink) / sizeof (*Glink); Index++) {
-    if (TextStartsWith (Trimmed, Glink[Index])) {
-      *Out = USB_HOST_BOARD_GLINK;
-      return TRUE;
-    }
-  }
-  return FALSE;
+  *Out = Soc->UsbHost;
+  return TRUE;
 }
 
 UINT64
@@ -94,6 +60,8 @@ CONST CHAR8 *
 UsbHostBoardName (IN USB_HOST_BOARD Board)
 {
   switch (Board) {
+  case USB_HOST_BOARD_NONE:
+    return "none";
   case USB_HOST_BOARD_SM6115:
     return "SM6115";
   case USB_HOST_BOARD_SM8250:

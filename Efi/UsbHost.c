@@ -779,6 +779,8 @@ BoardVbus (
     return FALSE;
   }
   switch (mBoard) {
+  case USB_HOST_BOARD_NONE:
+    break;
   case USB_HOST_BOARD_SM8250:
     return SchgSetOtg (TRUE, USB_HOST_SCHG_PMIC_INDEX_8250, On, Log);
   case USB_HOST_BOARD_SM6115:

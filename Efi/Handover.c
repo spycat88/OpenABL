@@ -22,6 +22,7 @@
 #include "Base/Memory.h"
 #include "Core/Carveouts.h"
 #include "Core/EfiData.h"
+#include "Core/Soc.h"
 #include "Efi/DisplayHandover.h"
 #include "Efi/DtFixup.h"
 #include "Efi/Dxe.h"
@@ -468,24 +469,6 @@ AllocateOutsideCarveouts (
 // whose XBL lacks runtime services an EFI_RT_PROPERTIES_TABLE that says
 // which.
 
-#define RT_NO_VMAP (UEFI_RT_SET_VIRTUAL_ADDRESS_MAP | UEFI_RT_CONVERT_POINTER)
-
-// The runtime services XBL lacks, by ChipInfo id: SDM845, SDA845, SM6115,
-// QCS6125. SetVirtualAddressMap hangs on SDM845 (a runtime driver fails an
-// ASSERT) and SM6115. On SM6115 XBL's runtime code is in the ADSP
-// carveout, so none can be called.
-STATIC CONST struct {
-  UINT32 ChipId;
-  UINT32 Unsupported;
-} mRuntimeGaps[] = {
-  // EFI runtime shutdown is broken on SDM845.
-  // Let kernel use PSCI for reset/shutdown.
-  {321, RT_NO_VMAP | UEFI_RT_RESET_SYSTEM},
-  {341, RT_NO_VMAP},
-  {444, UEFI_RT_ALL},
-  {467, RT_NO_VMAP},
-};
-
 STATIC EFI_GUID mRtPropertiesGuid = {
   0xeb66918a,
   0x7eef,
@@ -512,17 +495,14 @@ ChipId (VOID)
   return QcomChip (&Chip) && Chip.Id.Status == EFI_SUCCESS ? Chip.Id.Value : 0;
 }
 
-// The runtime services XBL lacks on chip Id, or 0 if it isn't listed.
+// The runtime services XBL lacks on chip Id (Core/Soc.c), or 0 if it isn't
+// listed.
 STATIC UINT32
 RuntimeGaps (IN UINT32 Id)
 {
-  for (UINTN Index = 0; Index < sizeof (mRuntimeGaps) / sizeof (*mRuntimeGaps);
-       Index++) {
-    if (Id == mRuntimeGaps[Index].ChipId) {
-      return mRuntimeGaps[Index].Unsupported;
-    }
-  }
-  return 0;
+  CONST SOC_INFO *Soc = SocById (Id);
+
+  return Soc ? Soc->RtUnsupported : 0;
 }
 
 // Installs Size bytes (up to a page) from Data as configuration table Guid,
@@ -600,7 +580,7 @@ Refuse (
   return EFI_UNSUPPORTED;
 }
 
-// Makes SetVirtualAddressMap refuse on the chips mRuntimeGaps lists, for
+// Makes SetVirtualAddressMap refuse on the chips Core/Soc.c lists, for
 // loaders that ignore the runtime properties table. Linux's stub then
 // keeps the runtime services at their physical addresses, as with
 // efi=novamap. Refuse is in our image, which stays intact until the OS

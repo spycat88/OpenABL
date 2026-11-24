@@ -20,6 +20,8 @@
 
 // How a SoC gets USB host: who supplies VBUS, and whose XHCI stack runs.
 typedef enum {
+  // No USB host.
+  USB_HOST_BOARD_NONE,
   // SM6115 (Kamorta). XBL has no host stack, so the ABL's own edk2 drivers
   // (NonDiscoverablePci, Xhci, UsbBus, UsbMass) run on the DWC3 core forced
   // into host mode. VBUS comes from the PMIC SCHG, then the SGM41515
@@ -34,7 +36,8 @@ typedef enum {
   USB_HOST_BOARD_GLINK,
 } USB_HOST_BOARD;
 
-// Picks the recipe by ChipInfo id, else by Name. Fails if there is none.
+// Picks the recipe Core/Soc.c gives a ChipInfo id, else by Name. Fails if
+// there is none.
 BOOLEAN
 UsbHostBoardOf (
   IN UINT32           ChipId,

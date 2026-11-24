@@ -23,6 +23,7 @@
 #include "Base/Print.h"
 #include "Base/Text.h"
 #include "Core/KernelCmdLine.h"
+#include "Core/Soc.h"
 #include "Efi/Abl.h"
 #include "Efi/Dxe.h"
 #include "Efi/MenuHost.h"
@@ -33,20 +34,6 @@
 
 #ifdef OABL_SYSFONT
 #include "Efi/SysFont.h"
-#endif
-
-// ChipInfo ids (GetChipId). The SM8250's XBL needs the GPT and FAT quirks.
-#define SM8250 356u
-#ifdef OABL_SDCC_SM4450
-#define SM4450 654u
-#endif
-#ifdef OABL_SDCC_SM6450
-// Snapdragon G2 Gen 1 (TG4070).
-#define SM6450 634u
-#endif
-#ifdef OABL_SDCC_SM7675
-// Snapdragon G2 Gen 2 (RP G2).
-#define SM7675_G2 700u
 #endif
 
 // Event group on which XBL's SdccDxe re-detects the SD card.
@@ -311,22 +298,7 @@ STATIC CONST UINT8 mAcmd41Mask[2][24] = {
 #define MOVK_S18R_CLEAR 0x72a81ff5u
 // Also sets XPC (OCR bit 28, SDXC power control).
 #define MOVK_XPC_S18R_CLEAR 0x72aa1ff5u
-// SM8250, SM8550/QCS8550/SG3xG2, SM8650 and SM8750/CQ8725S chip ids, whose
-// cards get XPC.
-STATIC CONST UINT32 mXpcChips[] = {356, 519, 536, 601, 603, 618, 639, 682, 706};
 #define MAX_SITES 16
-
-STATIC BOOLEAN
-WantsXpc (IN UINT32 Chip)
-{
-  for (UINTN Index = 0; Index < sizeof (mXpcChips) / sizeof (*mXpcChips);
-       Index++) {
-    if (mXpcChips[Index] == Chip) {
-      return TRUE;
-    }
-  }
-  return FALSE;
-}
 
 typedef struct _U64_LIST
 OABL_VEC (UINT64) U64_LIST;
@@ -604,10 +576,10 @@ typedef struct _SDCC_WORD {
 } SDCC_WORD;
 // An SdccDxe build that needs more than the S18R patch.
 typedef struct _SDCC_BUILD {
-  CONST CHAR8  *Name;
-  CONST UINT32 *Chips;
-  UINTN         NChips;
-  UINT64        ImageSize;
+  CONST CHAR8 *Name;
+  // The SoCs with this build: Sdcc in Core/Soc.c.
+  SOC_SDCC Sdcc;
+  UINT64   ImageSize;
   // Slot table to check before patching.
   BOOLEAN          HasSlots;
   UINT64           SlotsRva;
@@ -618,19 +590,16 @@ typedef struct _SDCC_BUILD {
 } SDCC_BUILD;
 
 #ifdef OABL_SDCC_SM4450
-STATIC CONST UINT32    mSm4450Chips[] = {SM4450};
 STATIC CONST UINT32    mSm4450Slots[] = {0x007c4000, 0x08804000};
 STATIC CONST SDCC_WORD mSm4450Words[] = {{0x527c, 0x360005a8, 0x1400002d},
                                          {0xb1c4, 0xb9400298, 0x52800058}};
 #endif
 #ifdef OABL_SDCC_SM6450
-STATIC CONST UINT32    mSm6450Chips[] = {SM6450};
 STATIC CONST UINT32    mSm6450Slots[] = {0x007c4000, 0x08804000};
 STATIC CONST SDCC_WORD mSm6450Words[] = {{0x51d8, 0x36000248, 0x14000012},
                                          {0xb08c, 0xb9400298, 0x52800058}};
 #endif
 #ifdef OABL_SDCC_SM7675
-STATIC CONST UINT32    mSm7675Chips[] = {SM7675_G2};
 STATIC CONST SDCC_WORD mSm7675Words[] = {{0xadec, 0xb9400298, 0x52800058}};
 #endif
 
@@ -640,15 +609,15 @@ STATIC CONST SDCC_WORD mSm7675Words[] = {{0xadec, 0xb9400298, 0x52800058}};
 // speed.
 STATIC CONST SDCC_BUILD mSdccBuilds[] = {
 #ifdef OABL_SDCC_SM4450
-  {"sm4450", mSm4450Chips, 1, 0x1e000, TRUE, 0x150f0, mSm4450Slots, 2,
+  {"sm4450", SOC_SDCC_SM4450, 0x1e000, TRUE, 0x150f0, mSm4450Slots, 2,
    mSm4450Words, 2},
 #endif
 #ifdef OABL_SDCC_SM6450
-  {"sm6450", mSm6450Chips, 1, 0x1e000, TRUE, 0x14fb8, mSm6450Slots, 2,
+  {"sm6450", SOC_SDCC_SM6450, 0x1e000, TRUE, 0x14fb8, mSm6450Slots, 2,
    mSm6450Words, 2},
 #endif
 #ifdef OABL_SDCC_SM7675
-  {"sm7675", mSm7675Chips, 1, 0x1e000, FALSE, 0, NULL, 0, mSm7675Words, 1},
+  {"sm7675", SOC_SDCC_SM7675, 0x1e000, FALSE, 0, NULL, 0, mSm7675Words, 1},
 #endif
 };
 
@@ -1331,14 +1300,16 @@ QuirksSdccUhs (
 {
   U64_LIST    Sites   = Acmd41Sites ();
   TRIES_WORDS Tries   = TriesWords ();
-  BOOLEAN     Xpc     = WantsXpc (Chip);
+  BOOLEAN     Xpc     = SocHasQuirks (Chip, SOC_SD_XPC);
   UINT32      Patched = 0;
   UINTN       Longer  = 0;
   BOOLEAN     Pulled  = FALSE;
   BOOLEAN     Detected;
 #if defined(OABL_SDCC_SM4450) || defined(OABL_SDCC_SM6450) ||                  \
   defined(OABL_SDCC_SM7675)
-  UINT64 Base = 0;
+  CONST SOC_INFO *Soc  = SocById (Chip);
+  SOC_SDCC        Sdcc = Soc ? Soc->Sdcc : SOC_SDCC_NONE;
+  UINT64          Base = 0;
 #endif
 
   if (Sites.Count > MAX_SITES) {
@@ -1406,14 +1377,7 @@ QuirksSdccUhs (
   defined(OABL_SDCC_SM7675)
   for (UINTN Build = 0; Build < sizeof (mSdccBuilds) / sizeof (*mSdccBuilds);
        Build++) {
-    BOOLEAN Match = FALSE;
-
-    for (UINTN Index = 0; Index < mSdccBuilds[Build].NChips; Index++) {
-      if (mSdccBuilds[Build].Chips[Index] == Chip) {
-        Match = TRUE;
-      }
-    }
-    if (Match) {
+    if (Sdcc != SOC_SDCC_NONE && mSdccBuilds[Build].Sdcc == Sdcc) {
       Base = SdccBuild (&mSdccBuilds[Build], Log);
       break;
     }
@@ -1426,7 +1390,7 @@ QuirksSdccUhs (
     SdSlotReport (mSdccSite, "before", Log);
   }
 #ifdef OABL_SDCC_SM7675
-  Pulled = Chip == SM7675_G2 && SdCmdPullup (Log);
+  Pulled = Sdcc == SOC_SDCC_SM7675 && SdCmdPullup (Log);
 #endif
   Detected = Patched > 0 || Longer > 0 || Pulled;
   if (Detected) {
@@ -1434,7 +1398,7 @@ QuirksSdccUhs (
     QuirksSignalSdDetect ();
 #ifdef OABL_SDCC_SM4450
     // Before the fallback: a stuck card is found again at high speed.
-    if (Base && Chip == SM4450 && SdStuck ()) {
+    if (Base && Sdcc == SOC_SDCC_SM4450 && SdStuck ()) {
       SdUnstick (Base, Log);
     }
 #endif
@@ -1544,7 +1508,7 @@ QuirksGptClobber (
   UINT32       Found[2]   = {0, 0};
   UINT32       Patched[2] = {0, 0};
 
-  if (Chip != SM8250 || mGptDone) {
+  if (!SocHasQuirks (Chip, SOC_XBL_GPT_FAT) || mGptDone) {
     return;
   }
   mGptDone = TRUE;
@@ -1629,7 +1593,7 @@ QuirksFatCache (
   EFI_HANDLE *Handles = NULL;
   UINTN       Count;
 
-  if (Chip != SM8250) {
+  if (!SocHasQuirks (Chip, SOC_XBL_GPT_FAT)) {
     return;
   }
   Count = LocateHandles (&gEfiSimpleFileSystemProtocolGuid, &Handles);
@@ -1863,14 +1827,20 @@ AndroidParams (
   CHAR8                              *Panel = QcomDisplayPanelConfig ();
   EFI_PLATFORMINFO_PLATFORM_INFO_TYPE Platform;
   QCOM_CHIP                           Chip;
-  BOOLEAN                             Sm8750;
+  CONST SOC_INFO                     *Soc = NULL;
+  BOOLEAN                             DisplayId;
   UINTN                               Count;
 
   (VOID)QcomPlatform (&Platform);
-  // Only the SM8750 stock ABL passes the display id.
-  Sm8750 = QcomChip (&Chip) && TextStartsWith (TextOf (Chip.Name), "SM8750");
-  Count  = KernelCmdLineAndroidParams (
-    Panel ? Panel : "", Platform.subtype, (UINT8)Platform.fusion, Sm8750, Params
+  // Only the SM8750 stock ABL passes the display id. Matched by ChipInfo's
+  // name, as before the SoC table.
+  if (QcomChip (&Chip)) {
+    Soc = SocByName (Chip.Name);
+  }
+  DisplayId = Soc && (Soc->Quirks & SOC_ANDROID_DISPLAY_ID) != 0;
+  Count     = KernelCmdLineAndroidParams (
+    Panel ? Panel : "", Platform.subtype, (UINT8)Platform.fusion, DisplayId,
+    Params
   );
 
   for (UINTN Index = 0; Index < Count; Index++) {
