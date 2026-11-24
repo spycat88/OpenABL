@@ -78,7 +78,8 @@ GptCfwParts (
 );
 
 // Like GptCfwParts, for every entry in use: the partitions of a disk image
-// written to userdata.
+// written to userdata. A generic name ("primary", as parted gives, or none)
+// is replaced with the name of a known type, such as "EFI system".
 UINTN
 GptUsedParts (
   IN CONST GPT_HEADER *Header,

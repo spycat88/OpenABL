@@ -256,6 +256,58 @@ GptCfwParts (
   return Found;
 }
 
+// Names parted and similar tools give every partition, which say nothing.
+STATIC CONST CHAR8 *CONST mGenericNames[] = {"", "primary", "logical",
+                                             "extended"};
+#define GENERIC_NAMES (sizeof (mGenericNames) / sizeof (mGenericNames[0]))
+
+// Type GUIDs, as stored, and the name shown for a partition of that type
+// whose own name is generic.
+STATIC CONST struct {
+  UINT8        Type[16];
+  CONST CHAR8 *Name;
+} mTypeNames[] = {
+  {{0x28, 0x73, 0x2a, 0xc1, 0x1f, 0xf8, 0xd2, 0x11, 0xba, 0x4b, 0x00, 0xa0,
+    0xc9, 0x3e, 0xc9, 0x3b},
+   "EFI system"},
+  {{0x45, 0xb0, 0x21, 0xb9, 0xf0, 0x1d, 0xc3, 0x41, 0xaf, 0x44, 0x4c, 0x6f,
+    0x28, 0x0d, 0x3f, 0xae},
+   "Linux root"},
+  {{0x6d, 0xfd, 0x57, 0x06, 0xab, 0xa4, 0xc4, 0x43, 0x84, 0xe5, 0x09, 0x33,
+    0xc8, 0x4b, 0x4f, 0x4f},
+   "Linux swap"},
+  {{0xaf, 0x3d, 0xc6, 0x0f, 0x83, 0x84, 0x72, 0x47, 0x8e, 0x79, 0x3d, 0x69,
+    0xd8, 0x47, 0x7d, 0xe4},
+   "Linux filesystem"},
+  {{0xff, 0xc2, 0x13, 0xbc, 0xe6, 0x59, 0x62, 0x42, 0xa3, 0x52, 0xb2, 0x75,
+    0xfd, 0x6f, 0x71, 0x72},
+   "Linux boot"},
+  {{0xa2, 0xa0, 0xd0, 0xeb, 0xe5, 0xb9, 0x33, 0x44, 0x87, 0xc0, 0x68, 0xb6,
+    0xb7, 0x26, 0x99, 0xc7},
+   "Basic data"},
+};
+#define TYPE_NAMES (sizeof (mTypeNames) / sizeof (mTypeNames[0]))
+
+// Gives Part its type's name when its own is generic and the type known.
+STATIC VOID
+NameFromType (
+  IN CONST UINT8      *Entry,
+  IN OUT GPT_CFW_PART *Part
+)
+{
+  BOOLEAN Generic = FALSE;
+
+  for (UINTN Index = 0; Index < GENERIC_NAMES; Index++) {
+    Generic = Generic || AsciiStrEq (Part->Name, mGenericNames[Index]);
+  }
+  for (UINTN Index = 0; Generic && Index < TYPE_NAMES; Index++) {
+    if (BytesEq (Entry, mTypeNames[Index].Type, 16)) {
+      AsciiStrCopy (Part->Name, sizeof (Part->Name), mTypeNames[Index].Name);
+      return;
+    }
+  }
+}
+
 UINTN
 GptUsedParts (
   IN CONST GPT_HEADER *Header,
@@ -274,6 +326,7 @@ GptUsedParts (
 
     if (InUse (Entry) && Found++ < Max) {
       FillPart (Entry, BlockSize, &Out[Found - 1]);
+      NameFromType (Entry, &Out[Found - 1]);
     }
   }
   return Found;
